@@ -9,10 +9,13 @@ t/04_attrib.t
 t/10_insert.t
 t/15_search.t
 t/50_traverse.t
+t/51_traverse.t
 t/55_scan.t
 t/56_scan.t
 t/57_breakme.t
 t/58_twice.t
 t/60_mindex.t
+t/61_mindex.t
 t/65_wildcards.t
+t/66_wildcards.t
 t/70_substrings.t

@@ -4,23 +4,26 @@
 use Test;
 use Text::Scan;
 
-BEGIN { plan tests => 11 }
+BEGIN { plan tests => 13 }
 
 $ref = new Text::Scan;
-$ref->usewild();
 
 @termlist = ( 
-	"banana boat * the mist",
+	"banana boat in the mist",
+	"business risk",
 	"pajamas are in",
-	"pajamas * * * party",
+	"pajamas are in the party",
 	"pajamas are in the party at my house",
 	"words",
 	"words are words",
 	"form",
-	"form of an * waterslide",
+	"form of an ice waterslide",
 	"tirewater",
-	"tirewater * my soup",
+	"tirewater in my soup",
+	"tidewater",
+	"tidewater shellfish",
 	"telephone",
+	"telephone me"
 );
  
 for my $term (@termlist) {
@@ -32,15 +35,16 @@ for my $term (@termlist) {
 );
 
 @answers = ( 
-	"pajamas are in the party", '',
-	"words", '',
-	"form", '',
-	"telephone", '',
-	"tirewater in my soup", ''
+	"business risk", 4,
+	"pajamas are in the party", 25,
+	"words", 64,
+	"form", 86,
+	"telephone", 108,
+	"tirewater in my soup", 118
 );
 
 for my $line ( @longlist ){
-	push @result, $ref->scan( $line );
+	push @result, $ref->mindex( $line );
 }
 
 # @result should be exactly @answers.

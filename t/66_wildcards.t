@@ -32,15 +32,15 @@ for my $term (@termlist) {
 );
 
 @answers = ( 
-	"pajamas are in the party", '',
-	"words", '',
-	"form", '',
-	"telephone", '',
-	"tirewater in my soup", ''
+	"pajamas are in the party", 25,
+	"words", 64,
+	"form", 86,
+	"telephone", 108,
+	"tirewater in my soup", 118,
 );
 
 for my $line ( @longlist ){
-	push @result, $ref->scan( $line );
+	push @result, $ref->mindex( $line );
 }
 
 # @result should be exactly @answers.

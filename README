@@ -28,9 +28,14 @@ SYNOPSIS
             # Check for membership ($val is true)
             $val = $dict->has('pig');
 
-            # Retrieve all keys
+            # Retrieve all keys. This returns all inserted keys in ascending 
+            # char value, substrings first.
             @keys = $dict->keys();
 
+            # Retrieve all values (in same order as corresponding keys) 
+            # (new in v0.10)
+            @vals = $dict->values();
+        
             # Like perl's index() but with multiple patterns (new in v0.07)
             # Scan for the starting positions of terms.
             @indices = $dict->mindex( $document );
@@ -88,11 +93,12 @@ TO DO
     filehandle instead of a string scalar.
 
 CREDITS
-    This code is heavily borrowed from both Bentley & Sedgwick, and Leon
-    Brocard's additions to it for "Tree::Ternary_XS". The differences are in
-    the modified search algorithm to allow for scanning, the storage of
-    keys/values, and an extra node-rotation for gradual self-adjusting
-    optimization to the statistical characteristics of the target text.
+    The basic framework for this code is borrowed from both Bentley &
+    Sedgwick, and Leon Brocard's additions to it for "Tree::Ternary_XS". The
+    differences are in the modified search algorithm to allow for scanning,
+    the storage of keys/values, and an extra node-rotation for gradual
+    self-adjusting optimization to the statistical characteristics of the
+    target text.
 
     Many test scripts come directly from Rogaski's "Tree::Ternary" module.
 

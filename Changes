@@ -1,4 +1,4 @@
-Revision history for Perl extension Scan.
+Revision history for Perl extension Text::Scan.
 
 0.01  Mon Jul 16 04:14:30 2001
 	- original version; created by h2xs 1.20 with options
@@ -16,3 +16,8 @@ Revision history for Perl extension Scan.
 	- Added wildcard functionality with usewild()
 	- Reduced memory by eliminating separate nodes for null-termination
 	- increased speed 30%
+
+0.10  Thu Mar 21 13:45:59 PST 2002
+	- Reduced memory by no longer storing keys explicitly. Now returns matched string in place of key, which is the same except in wildcard matching.
+
+
