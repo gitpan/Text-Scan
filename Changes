@@ -20,4 +20,11 @@ Revision history for Perl extension Text::Scan.
 0.10  Thu Mar 21 13:45:59 PST 2002
 	- Reduced memory by no longer storing keys explicitly. Now returns matched string in place of key, which is the same except in wildcard matching.
 
+0.11  Mon Apr  1 17:50:35 PST 2002
+	- Fixed bug causing spurious text-skipping when using wildcards.
+	- Fixed memory leak when using wildcards
 
+0.12  Wed Apr 10 17:43:57 PDT 2002
+	- Fixed *another* bug causing spurious text-skipping
+	- Fixed a much smaller memory leak
+	- added diagnostic function btrees(), count of used eqkid links.

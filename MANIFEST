@@ -18,4 +18,5 @@ t/60_mindex.t
 t/61_mindex.t
 t/65_wildcards.t
 t/66_wildcards.t
+t/67_wildcards.t
 t/70_substrings.t

@@ -5,15 +5,15 @@ use strict;
 use warnings;
 
 use vars qw($VERSION);
-$VERSION = '0.10';
+$VERSION = '0.12';
 
 # The following are for debugging only
 #use ExtUtils::Embed;
 #use Inline C => Config => CCFLAGS => "-g"; # add debug stubs to C lib
-#use Inline Config => CLEAN_AFTER_BUILD => 0; # cp _Inline/Text/Scan/Scan.xs .
+#use Inline Config => CLEAN_AFTER_BUILD => 0; # cp _Inline/build/Text/Scan/Scan.xs .
 
 use Inline C => 'DATA',
-			VERSION => '0.10',
+			VERSION => '0.12',
 			NAME => 'Text::Scan';
 
 
@@ -138,6 +138,7 @@ typedef struct tobj {
 	Tptr root;
 	int terminals;
 	int nodes;
+	int btrees;
 	int maxpath;
 	AV* found_keys;
 	AV* found_vals;
@@ -146,12 +147,12 @@ typedef struct tobj {
 
 
 typedef struct pmatch *pmPtr;
-
 typedef struct pmatch { // A link in a list of pending matches.
 	int depth; 
 	pmPtr next;
 	Tptr p;
 	char *t;
+	bool inWild;
 } pMatch;
 
 _malloc(Tobj *pTernary) {
@@ -159,26 +160,29 @@ _malloc(Tobj *pTernary) {
 	av_clear(pTernary->found_vals);
 }
 
-Tptr _insert(Tobj *pTernary, Tptr p, char *s, SV* key, SV* val) {
+Tptr _insert_(Tobj *pTernary, Tptr p, char *s, SV* val) {
 	if (p == 0) {
 		p = (Tptr) malloc(sizeof(Tnode));
 		p->splitchar = *s;
-		p->lokid = p->eqkid = p->hikid = p->keyval = 0;
+		p->lokid = p->eqkid = p->hikid = (Tptr) p->keyval = (SV*) 0;
 		pTernary->nodes++;
 	}
 	if (*s < p->splitchar)
-		p->lokid = _insert(pTernary, p->lokid, s, key, val);
+		p->lokid = _insert_(pTernary, p->lokid, s, val);
 	else if (*s == p->splitchar) {
 		if (*(s+1) == 0 || *s == 0) { //*s==0 special case for empty str
 			if (!p->keyval) {
 				pTernary->terminals++;
 			}
+			else sv_2mortal(p->keyval);
 			p->keyval = val;
 		}
-		else
-			p->eqkid = _insert(pTernary, p->eqkid, ++s, key, val);
+		else {
+			if(!p->eqkid) pTernary->btrees++;
+			p->eqkid = _insert_(pTernary, p->eqkid, ++s, val);
+		}
 	} else
-		p->hikid = _insert(pTernary, p->hikid, s, key, val);
+		p->hikid = _insert_(pTernary, p->hikid, s, val);
 
 	return p;
 }
@@ -193,6 +197,8 @@ void _cleanup_(Tptr p) {
 		
 		_cleanup_(p->hikid);
 		
+		if(p->keyval) sv_2mortal(p->keyval);
+
 		free(p);  
 	}
 }
@@ -247,20 +253,20 @@ void _rotate(Tptr grandparent, Tptr parent, Tptr child){
 // Return the node representing the char s, if it exists, from this btree.
 Tptr _bsearch( Tptr q, char s ){
 	
-	Tptr parent = q, grandparent = q;
+//	Tptr parent = q, grandparent = q;
 	while(q){
 		if(s < q->splitchar){
-			grandparent = parent;
-			parent = q;
+//			grandparent = parent;
+//			parent = q;
 			q = q->lokid;
 		}
 		else if (s == q->splitchar){
-			_rotate( grandparent, parent, q );      //optimization
+//			_rotate( grandparent, parent, q );      //optimization
 			return q;
 		}
 		else {
-			grandparent = parent;
-			parent = q;
+//			grandparent = parent;
+//			parent = q;
 			q = q->hikid;
 		}
 	}
@@ -308,79 +314,86 @@ int _find_literal_match(Tptr root, char *s, SV** champaddr){
 }
 
 
-int _find_wild_match(Tptr root, char *s, SV** champaddr){
+int _find_wild_match(Tobj *pTernary, Tptr root, char *s, SV** champaddr){
 
 	Tptr wildp;
 	pmPtr tm;
 	pmPtr temptm;
-
 	int matchlen = 0;
 	
-		tm  = (pmPtr) malloc(sizeof(pMatch));
-		tm->depth = 0;
-		tm->next = 0;
-		tm->p = root;
-		tm->t = s;
-
-		// loop invariant: successful match in progress, longest
+	tm  = (pmPtr) malloc(sizeof(pMatch));
+	tm->depth = 0;
+	tm->next = 0;
+	tm->p = root;
+	tm->t = s;
+	tm->inWild = FALSE;
+		
+		// successful match in progress, longest
 		// match stored in "champaddr".
-		while(tm && tm->p){
+	while(tm && tm->p){
+		if( tm->inWild ){
+			if( *(tm->t) == ' ' || *(tm->t) == 0 ){
+				// record a match if possible
+				if( tm->p->keyval && tm->depth > matchlen ){
+					*champaddr = tm->p->keyval;
+					matchlen = tm->depth;
+				}
+				// advance p out of wildcard, loop with same char ' '
+				tm->p = tm->p->eqkid;
+				tm->inWild = FALSE;
+			}
+			else {
+				// eat next char, stay on same p
+				tm->t++;
+				tm->depth++;
+			}
+		}
+		else { // Not on a wildcard
 
+			// Check for a wildcards (There's got to be a better way!)
+			// Insert new match state in next pos in linked list.
+			if( wildp = _bsearch( tm->p, '*' ) ){ //Branch off 
+				temptm = (pmPtr) malloc(sizeof(pMatch));
+				temptm->p = wildp;
+				temptm->t = tm->t;
+				temptm->depth = tm->depth;
+				temptm->next = tm->next;
+				temptm->inWild = TRUE;
+				tm->next = temptm;
+			}
 
-			if( tm->p->splitchar == '*' ){
+			// search for t, increment p
+			tm->p = _bsearch( tm->p, *(tm->t) );
+			
+			if(tm->p){
 
-				if( *(tm->t) == ' ' || *(tm->t) == 0 ){
-					// record a match if possible
-					if( tm->p->keyval && tm->depth > matchlen ){
+				tm->t++;
+
+				// record a match if possible
+				if( tm->p->keyval && tm->depth > matchlen ) 
+					if(*(tm->t) == ' ' || *(tm->t) == 0 ){
 						*champaddr = tm->p->keyval;
 						matchlen = tm->depth;
 					}
-					// advance p out of wildcard, loop with same char ' '
-					tm->p = tm->p->eqkid;
-				}
-				else {
-					// eat next char, stay on same p
-					tm->t++;
-					tm->depth++;
-				}
-			}
-			else { // Not on a wildcard
-
-				// Check for a wildcards (There's got to be a better way!)
-				// Insert new match state in next pos in linked list.
-				if( wildp = _bsearch( tm->p, '*' ) ){ //Branch off 
-					temptm = (pmPtr) malloc(sizeof(pMatch));
-					temptm->p = wildp;
-					temptm->t = tm->t;
-					temptm->depth = tm->depth;
-					temptm->next = tm->next;
-					tm->next = temptm;
-				}
-
-				// search for t, increment p
-				tm->p = _bsearch( tm->p, *(tm->t) );
-
-				if(tm->p){
-
-					tm->t++;
-						// record a match if possible
-					if( tm->p->keyval && tm->depth > matchlen ) 
-						if(*(tm->t) == ' ' || *(tm->t) == 0 ){
-							*champaddr = tm->p->keyval;
-							matchlen = tm->depth;
-						}
 					
-					tm->depth++;
-					tm->p = tm->p->eqkid;
-				}
-				// fall back on previous match state, if any
-				else {
-					temptm = tm->next;
-					free(tm);
-					tm = temptm; 
-				} //Go back to last branch
+				tm->depth++;
+				tm->p = tm->p->eqkid;
 			}
+			// fall back on previous match state, if any
+			if(!tm->p) {
+				temptm = tm->next;
+				free(tm);
+				tm = temptm; 
+			} //Go back to last branch
 		}
+	}
+
+	while(tm){
+		temptm = tm->next;
+		free(tm);
+		tm = temptm;
+	}
+
 	return matchlen;
 }
 
@@ -390,7 +403,7 @@ void _scan(Tobj *pTernary, Tptr root, char *s, bool isMindex) {
 
 	AV* keys = pTernary->found_keys;
 	AV* vals = pTernary->found_vals;
-	SV** champ = 0;
+	SV* champ = 0;
 	char* t;
 	int matchlen = 0;
 	int position = 0;
@@ -399,7 +412,7 @@ void _scan(Tobj *pTernary, Tptr root, char *s, bool isMindex) {
 	while(*s){
 		
 		if(pTernary->use_wildcards){
-			matchlen = _find_wild_match(root, s, &champ);
+			matchlen = _find_wild_match(pTernary, root, s, &champ);
 		}
 		else {
 			matchlen = _find_literal_match(root, s, &champ);
@@ -479,8 +492,9 @@ SV* new(char* class){
 	pTernary->root = 0;  
 	pTernary->terminals = 0;  
 	pTernary->nodes = 0;  
+	pTernary->btrees = 0;
 	pTernary->maxpath = 0;
-	
+
 	pTernary->found_keys = (AV*) newAV(); 
 	pTernary->found_vals = (AV*) newAV();
 
@@ -507,12 +521,11 @@ int insert(SV* obj, SV* key, SV* val) {
 	Tobj *pTernary = (Tobj*)SvIV(SvRV(obj));
 
 	//Don't make a copy of the key, but do make one of the value.
-	SV* k = key;
 	SV* v = newSVsv( val );
-	char* s = SvPV_nolen( k );
-	int keylen = strlen(k);
+	char* s = SvPV_nolen( key );
+	int keylen = strlen(s);
 	if(keylen > pTernary->maxpath) pTernary->maxpath = keylen;
-	pTernary->root = _insert(pTernary, pTernary->root, s, k, v);
+	pTernary->root = _insert_(pTernary, pTernary->root, s, v);
 	return 1;
 }
 
@@ -574,7 +587,6 @@ int terminals(SV* obj){
 	return pTernary->terminals;
 }
 
-
 void _relay(SV* obj, char *s, bool isMindex) {
 	Tobj* pTernary = (Tobj*)SvIV(SvRV(obj));
 	int i;
@@ -604,4 +616,29 @@ void scan(SV* obj, char *s){
 	_relay(obj, s, FALSE);
 }
 
+
+/*
+int _btrees(Tobj *pTernary, Tptr p){
+
+    int fromhere = 0;
+
+    if (!p) return 0;
+
+    fromhere = _btrees(pTernary, p->lokid);
+
+    if (p->eqkid){
+        fromhere++;
+        fromhere += _btrees(pTernary, p->eqkid);
+    }
+
+    fromhere += _btrees(pTernary, p->hikid);
+
+    return fromhere;
+}*/
+
+int btrees(SV* obj){
+    Tobj* pTernary = (Tobj*)SvIV(SvRV(obj));
+
+	return pTernary->btrees;
+}
 
