@@ -4,7 +4,7 @@
 use Test;
 use Text::Scan;
 
-BEGIN { plan tests => 5 }
+BEGIN { plan tests => 7 }
 
 $ref = new Text::Scan;
 $ref->usewild();
@@ -28,6 +28,7 @@ for my $term (@termlist) {
 
 @answers = ( 
 	"marine corps expeditionary forces", 0,
+	"mso 456 uss", 0,
 	"mso 456 uss adroit mso 509", 0,
 );
 

@@ -3,7 +3,7 @@
 use Test;
 use Text::Scan;
 
-BEGIN { plan tests => 19 }
+BEGIN { plan tests => 35 }
 
 $ref = new Text::Scan;
 
@@ -41,16 +41,24 @@ for my $term (@termlist) {
 	"telephone",
 );
 
-@longlist = ( 
+@longlist = (
+	"banana boat", "banana boat",
 	"banana boat in the mist", "banana boat in the mist",
+	"pajamas are in", "pajamas are in",
+	"pajamas are in the party", "pajamas are in the party",
+	"pajamas are in", "pajamas are in",
 	"pajamas are in the party", "pajamas are in the party",
 	"pajamas are in the party at my house", "pajamas are in the party at my house",
+	"words", "words",
 	"words are words", "words are words",
 	"words", "words",
+	"form", "form",
 	"form of an ice waterslide", "form of an ice waterslide",
+	"tirewater", "tirewater",
 	"tirewater in my soup", "tirewater in my soup",
+	"tidewater", "tidewater",
 	"tidewater shellfish", "tidewater shellfish",
-	"telephone", "telephone",
+	"telephone", "telephone"
 );
 
 for my $line ( @texts ){

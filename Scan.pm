@@ -5,7 +5,7 @@ use strict;
 use warnings;
 
 use vars qw($VERSION);
-$VERSION = '0.15';
+$VERSION = '0.16';
 
 # The following are for debugging only
 #use ExtUtils::Embed;
@@ -13,7 +13,7 @@ $VERSION = '0.15';
 #use Inline Config => CLEAN_AFTER_BUILD => 0; # cp _Inline/build/Text/Scan/Scan.xs .
 
 use Inline C => 'DATA',
-			VERSION => '0.15',
+			VERSION => '0.16',
 			NAME => 'Text::Scan';
 
 sub serialize {
@@ -54,31 +54,39 @@ Text::Scan - Fast search for very large numbers of keys in a body of text.
 	}
 
 	# Scan a document for matches
+	$document = 'the dog ate the bear but the dog got indigestion';
 	%found = $dict->scan( $document );
+	# now %found is ( dog => canine, bear => ursine )
 
 	# Or, if you need to count number of occurrences of any given 
 	# key, use an array. This will give you a countable flat list
 	# of key => value pairs.
 	@found = $dict->scan( $document );
+	# now @found is ( dog => canine, bear => ursine, dog => canine )
 
 	# Check for membership ($val is true)
 	$val = $dict->has('pig');
 
-	# Retrieve all keys. This returns all inserted keys in ascending 
-	# char value, substrings first.
+	# Retrieve all keys. This returns all inserted keys in order 
+	# of insertion 
 	@keys = $dict->keys();
+	# @keys is ( dog, bear, pig )
 
 	# Retrieve all values (in same order as corresponding keys) 
 	# (new in v0.10)
 	@vals = $dict->values();
+	# @vals is ( canine, ursine, porcine )
 	
+	# "mindex"
 	# Like perl's index() but with multiple patterns (new in v0.07)
-	# Scan for the starting positions of terms.
+	# you can scan for the starting positions of terms.
 	@indices = $dict->mindex( $document );
+	# @indices is ( dog => 4, bear => 16, dog => 29 ) 
 
-	# The hash version of mindex() records the position of the first 
-	# occurrences of each word
+	# The hash context yeilds the position of the last occurrences 
+	# of each word 
 	%indices = $dict->mindex( $document ); 
+	# %indices is ( dog => 26, bear => 16 )
 
 	# Turn on wildcard scanning. (New in v0.09) 
 	# This can be done anytime. Works for scan() and mindex()
@@ -94,7 +102,7 @@ Text::Scan - Fast search for very large numbers of keys in a body of text.
 	
 =head1 DESCRIPTION
 
-This module provides facilities for fast searching on arbitrarily long texts with very many search keys. The basic object behaves somewhat like a perl hash, except that you can retrieve based on a superstring of any keys stored. Simply scan a string as shown above and you will get back a perl hash (or list) of all keys found in the string (along with associated values (or positions if you use mindex() instead of scan(), see examples above)). All keys present in the text are returned, except in the case where one or more keys are present but are prefixes of another longer key. In these cases only the longest key is returned. 
+This module provides facilities for fast searching on arbitrarily long texts with very many search keys. The basic object behaves somewhat like a perl hash, except that you can retrieve based on a superstring of any keys stored. Simply scan a string as shown above and you will get back a perl hash (or list) of all keys found in the string (along with associated values (or positions if you use mindex() instead of scan(), see examples above)). All keys present in the text are returned.
 
 NOTE: This is a behavioral change from previous versions where keys could never overlap. Now they may overlap and still be detected.
 
@@ -228,6 +236,7 @@ trans _demote(trans parent){
 }
 
 
+
 trans _insert_(fsm m, trans p, char *s, SV* val) {
 	
 	trans t = p;
@@ -318,10 +327,32 @@ trans _bsearch( trans q, char s ){
 	return q;
 }
 
+void _record_match(char *s,
+					int position,
+					int matchlen, 
+					AV* keys, 
+					AV* vals, 
+					SV* val, 
+					bool isMindex){
+
+	av_push(keys, newSVpvn(s,matchlen+1));
+
+	if(isMindex){
+		av_push(vals, newSViv(position));
+	}
+	else {
+		av_push(vals, val);
+		SvREFCNT_inc(val);
+	}
+}
 
 
-
-int _find_literal_match(trans root, char *s, SV** champaddr){
+int _find_literal_match(trans root, 
+						char *s, 
+						int position, 
+						AV* keys, 
+						AV* vals, 
+						bool isMindex){
 
 	int matchlen = 0;
 	int depth = 0;
@@ -334,7 +365,14 @@ int _find_literal_match(trans root, char *s, SV** champaddr){
 		// if this is a termination state
 		if(!p->splitchar){
 			if( *t == ' ' || *t == 0 ){
-				*champaddr = (SV*) p->next_state;
+				_record_match(s,
+							position,
+							depth-1, 
+							keys, 
+							vals, 
+							(SV*) p->next_state, 
+							isMindex);
+				//*champaddr = (SV*) p->next_state;
 				matchlen = depth - 1;
 			}
 			p = p->next_trans;
@@ -355,7 +393,14 @@ int _find_literal_match(trans root, char *s, SV** champaddr){
 
 
 
-int _find_wild_match(trans root, char *s, SV** champaddr){
+
+
+int _find_wild_match(trans root, 
+					char *s, 
+					int position, 
+					AV* keys, 
+					AV* vals, 
+					bool isMindex){
 
 	trans wildp;
 	pmPtr tm;
@@ -379,7 +424,14 @@ int _find_wild_match(trans root, char *s, SV** champaddr){
 			if( *(tm->t) == ' ' || *(tm->t) == 0 ){
 				// record a match if possible
 				if( !tm->p->splitchar && tm->depth > matchlen ){
-					*champaddr = (SV*) tm->p->next_state;
+					_record_match(s,
+								position,
+								tm->depth - 1, 
+								keys, 
+								vals, 
+								(SV*) tm->p->next_state, 
+								isMindex);
+					//*champaddr = (SV*) tm->p->next_state;
 					matchlen = tm->depth - 1;
 				}
 				// advance p out of wildcard, loop with same char ' '
@@ -397,7 +449,14 @@ int _find_wild_match(trans root, char *s, SV** champaddr){
 			if( !tm->p->splitchar ){
 				if( tm->depth > matchlen && 
 					(*(tm->t) == ' ' || *(tm->t) == 0) ){
-					*champaddr = (SV*) tm->p->next_state;
+					_record_match(s,
+								position,
+								tm->depth - 1, 
+								keys, 
+								vals, 
+								(SV*) tm->p->next_state, 
+								isMindex);
+					//*champaddr = (SV*) tm->p->next_state;
 					matchlen = tm->depth - 1;
 				}
 				tm->p = tm->p->next_trans;
@@ -449,7 +508,7 @@ void _scan(fsm m, trans root, char *s, bool isMindex) {
 
 	AV* keys = m->found_keys;
 	AV* vals = m->found_vals;
-	SV* champ = 0;
+//	SV* champ = 0;
 	char* t;
 	int matchlen = 0;
 	int position = 0;
@@ -458,15 +517,15 @@ void _scan(fsm m, trans root, char *s, bool isMindex) {
 	while(*s){
 		
 		if(m->use_wildcards){
-			matchlen = _find_wild_match(root, s, &champ);
+			matchlen = _find_wild_match(root, s, position, keys, vals, isMindex);
 		}
 		else {
-			matchlen = _find_literal_match(root, s, &champ);
+			matchlen = _find_literal_match(root, s, position, keys, vals, isMindex);
 		}
 		// truncate s by length of match or first word...
 		if(matchlen){
 
-			av_push(keys, newSVpvn(s,matchlen+1));
+/*			av_push(keys, newSVpvn(s,matchlen+1));
 
 			if(isMindex){
 				av_push(vals, newSViv(position));
@@ -475,6 +534,7 @@ void _scan(fsm m, trans root, char *s, bool isMindex) {
 				av_push(vals, champ);
 				SvREFCNT_inc(champ);
 			}
+*/
 
 // The following substitution makes the scan start at every word,
 // not just after the last match.
@@ -535,7 +595,7 @@ SV* new(char* class){
 	m->transitions = 0;  
 	m->states = 0;  
 	m->maxpath = 0;
-	
+
 	m->found_keys = (AV*) newAV(); 
 	m->found_vals = (AV*) newAV();
 
@@ -558,6 +618,7 @@ void usewild(SV* obj){
 	fsm m = (fsm)SvIV(SvRV(obj));
 	m->use_wildcards = TRUE;
 }
+
 
 int insert(SV* obj, SV* key, SV* val) {
 	fsm m = (fsm)SvIV(SvRV(obj));

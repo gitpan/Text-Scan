@@ -39,3 +39,6 @@ Revision history for Perl extension Text::Scan.
 0.15 Wed Oct 30 15:35:32 PST 2002
 	- Replaced 'lround' call with more common 'ceil', unbreaking solaris
 
+0.16 Tue Sep 30 15:09:23 PDT 2003
+	- Now longer patterns do not clobber shorter patterns having the same prefix.
+

@@ -4,7 +4,7 @@
 use Test;
 use Text::Scan;
 
-BEGIN { plan tests => 11 }
+BEGIN { plan tests => 15 }
 
 $ref = new Text::Scan;
 $ref->usewild();
@@ -32,10 +32,12 @@ for my $term (@termlist) {
 );
 
 @answers = ( 
+	"pajamas are in", '',
 	"pajamas are in the party", '',
 	"words", '',
 	"form", '',
 	"telephone", '',
+	"tirewater", '',
 	"tirewater in my soup", ''
 );
 

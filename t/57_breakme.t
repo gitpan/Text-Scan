@@ -4,7 +4,7 @@
 use Test;
 use Text::Scan;
 
-BEGIN { plan tests => 343 }
+BEGIN { plan tests => 347 }
 
 $ref = new Text::Scan;
 
@@ -159,8 +159,8 @@ for my $line ( @longlist ){
 	push @result, $ref->scan( $line );
 }
 
-print "results contain ", scalar @result, " items\n";
-print join("\n", @result), "\n";
+#print "results contain ", scalar @result, " items\n ";
+#print join("\n", @result), "\n";
 
 ok( @result );
 
@@ -315,6 +315,8 @@ my @answers = (
 	"~",
 	"methods",
 	"~",
+	"research",
+	"~",
 	"research and development",
 	"~",
 	"research",
@@ -459,6 +461,8 @@ my @answers = (
 	"~",
 	"research",
 	"~",
+	"research",
+	"~",
 	"research and development",
 	"~",
 	"research",
@@ -512,7 +516,8 @@ my @answers = (
 	);
 
 for my $i (0..$#result){
-	ok($result[$i] eq $answers[$i]);
+	ok($result[$i], $answers[$i]);
+	print "$result[$i] eq $answers[$i]\n";
 }
 
 

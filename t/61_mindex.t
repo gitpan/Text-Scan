@@ -4,7 +4,7 @@
 use Test;
 use Text::Scan;
 
-BEGIN { plan tests => 13 }
+BEGIN { plan tests => 17 }
 
 $ref = new Text::Scan;
 
@@ -36,10 +36,12 @@ for my $term (@termlist) {
 
 @answers = ( 
 	"business risk", 4,
+	"pajamas are in", 25,
 	"pajamas are in the party", 25,
 	"words", 64,
 	"form", 86,
 	"telephone", 108,
+	"tirewater", 118,
 	"tirewater in my soup", 118
 );
 

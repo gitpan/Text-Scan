@@ -18,31 +18,39 @@ SYNOPSIS
             }
 
             # Scan a document for matches
+            $document = 'the dog ate the bear but the dog got indigestion';
             %found = $dict->scan( $document );
+            # now %found is ( dog => canine, bear => ursine )
 
             # Or, if you need to count number of occurrences of any given 
             # key, use an array. This will give you a countable flat list
             # of key => value pairs.
             @found = $dict->scan( $document );
+            # now @found is ( dog => canine, bear => ursine, dog => canine )
 
             # Check for membership ($val is true)
             $val = $dict->has('pig');
 
-            # Retrieve all keys. This returns all inserted keys in ascending 
-            # char value, substrings first.
+            # Retrieve all keys. This returns all inserted keys in order 
+            # of insertion 
             @keys = $dict->keys();
+            # @keys is ( dog, bear, pig )
 
             # Retrieve all values (in same order as corresponding keys) 
             # (new in v0.10)
             @vals = $dict->values();
+            # @vals is ( canine, ursine, porcine )
         
+            # "mindex"
             # Like perl's index() but with multiple patterns (new in v0.07)
-            # Scan for the starting positions of terms.
+            # you can scan for the starting positions of terms.
             @indices = $dict->mindex( $document );
+            # @indices is ( dog => 4, bear => 16, dog => 29 ) 
 
-            # The hash version of mindex() records the position of the first 
-            # occurrences of each word
+            # The hash context yeilds the position of the last occurrences 
+            # of each word 
             %indices = $dict->mindex( $document ); 
+            # %indices is ( dog => 26, bear => 16 )
 
             # Turn on wildcard scanning. (New in v0.09) 
             # This can be done anytime. Works for scan() and mindex()
@@ -62,9 +70,7 @@ DESCRIPTION
     keys stored. Simply scan a string as shown above and you will get back a
     perl hash (or list) of all keys found in the string (along with
     associated values (or positions if you use mindex() instead of scan(),
-    see examples above)). All keys present in the text are returned, except
-    in the case where one or more keys are present but are prefixes of
-    another longer key. In these cases only the longest key is returned.
+    see examples above)). All keys present in the text are returned.
 
     NOTE: This is a behavioral change from previous versions where keys
     could never overlap. Now they may overlap and still be detected.

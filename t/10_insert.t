@@ -61,15 +61,15 @@ ok($ref->transitions(), 43);
 ok($ref->terminals(), 6);
 ok($ref->states(), 38);
 
-for ($i = 1;$i < 256;$i++) { $big .= chr($i); }
+for ($i = 2;$i < 256;$i++) { $big .= chr($i); }
 ok($ref->insert($big, "~"));
-ok($ref->transitions(), 299);
+ok($ref->transitions(), 298);
 ok($ref->terminals(), 7);
-ok($ref->states(), 293);
+ok($ref->states(), 292);
 
 ok($ref->insert($big,"~"));
-ok($ref->transitions(), 299);
+ok($ref->transitions(), 298);
 ok($ref->terminals(), 7);
-ok($ref->states(), 293);
+ok($ref->states(), 292);
 
 
