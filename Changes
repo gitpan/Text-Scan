@@ -8,3 +8,7 @@ Revision history for Perl extension Scan.
 0.04  Mon Jul 23 02:48:08 PDT 2001
 	- fixed darwin implicit decl. bug and '_cleanup' symbol conflict.
 
+0.05  Tue Aug 14 20:10:19 PDT 2001
+	- Major revision. Prompted by segfault whenever keys in tree < found items in text.
+
+

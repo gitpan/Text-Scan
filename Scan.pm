@@ -5,7 +5,7 @@ use strict;
 use warnings;
 
 use vars qw($VERSION);
-$VERSION = '0.04';
+$VERSION = '0.05';
 
 # The following are for debugging only
 use ExtUtils::Embed;
@@ -13,7 +13,7 @@ use Inline C => Config => CCFLAGS => "-g"; # add debug stubs to C lib
 use Inline Config => CLEAN_AFTER_BUILD => 0; # cp _Inline/Text/Scan/Scan.xs .
 
 use Inline C => 'DATA',
-			VERSION => '0.04',
+			VERSION => '0.05',
 			NAME => 'Text::Scan';
 
 
@@ -106,65 +106,52 @@ __C__
 typedef struct tnode *Tptr;
 
 typedef struct tnode {
-  char splitchar;
-  Tptr lokid, eqkid, hikid;
-  SV* val;
+	char splitchar;
+	Tptr lokid, eqkid, hikid;
+	SV** keyval;
 } Tnode;
 
 typedef struct tobj {
   Tptr root;
   int terminals;
   int nodes;
-  char** searchchar;
-  SV** val;
-  int searchcharn;
-  int searchn;
+  AV* found_keys;
+  AV* found_vals;
 } Tobj;
 
 
-
 _malloc(Tobj *pTernary) {
-	if (pTernary->searchcharn != pTernary->terminals) {
-		if (pTernary->searchcharn > 0) {
-			free(pTernary->searchchar);
-			free(pTernary->val);
-		}
-		pTernary->searchchar = 
-			(char **) malloc(sizeof(char*) * (pTernary->terminals + 1));
-		pTernary->val = 
-			(SV **) malloc(sizeof(SV*) * (pTernary->terminals + 1));
-		pTernary->searchcharn = pTernary->terminals;
-	}
+	av_clear(pTernary->found_keys);
+	av_clear(pTernary->found_vals);
 }
 
-
-
-
-Tptr _insert(Tobj *pTernary, Tptr p, char *s, char *insertstr, SV* v) {
+Tptr _insert(Tobj *pTernary, Tptr p, char *s, SV* key, SV* val) {
 	if (p == 0) {
 		p = (Tptr) malloc(sizeof(Tnode));
 		p->splitchar = *s;
-		p->lokid = p->eqkid = p->hikid = 0;
+		p->lokid = p->eqkid = p->hikid = p->keyval = 0;
 		pTernary->nodes++;
 	}
 	if (*s < p->splitchar)
-		p->lokid = _insert(pTernary, p->lokid, s, insertstr, v);
+		p->lokid = _insert(pTernary, p->lokid, s, key, val);
 	else if (*s == p->splitchar) {
 		if (*s == 0) {
-			if (p->eqkid) {
-				free(p->eqkid);
-				p->eqkid = (Tptr) insertstr;
-				p->val = v;
+			if (p->keyval) {
+				free(p->keyval);
+				p->keyval = (SV**) malloc(sizeof(SV*) * 2); 
+				p->keyval[0] = key;
+				p->keyval[1] = val;
 			} else {
-				p->eqkid = (Tptr) insertstr;
+				p->keyval = (SV**) malloc(sizeof(SV*) * 2); 
+				p->keyval[0] = key;
+				p->keyval[1] = val;
 				pTernary->terminals++;
-				p->val = v;
 			}
 		}
 		else
-			p->eqkid = _insert(pTernary, p->eqkid, ++s, insertstr, v);
+			p->eqkid = _insert(pTernary, p->eqkid, ++s, key, val);
 	} else
-		p->hikid = _insert(pTernary, p->hikid, s, insertstr, v);
+		p->hikid = _insert(pTernary, p->hikid, s, key, val);
 
 	return p;
 }
@@ -175,8 +162,7 @@ void _cleanup_(Tptr p) {
 		if (p->splitchar) {
 			_cleanup_(p->eqkid);
 		} else {
-			free(p->eqkid); /* It's just a string, free the memory */
-			/* sv_2mortal(p->val);  Is this necessary?? */
+			free(p->keyval); /* It's a SV**, free the memory */
 		}
 		_cleanup_(p->hikid);
 		free(p);  
@@ -253,12 +239,15 @@ Tptr _bsearch( Tptr q, char s ){
 	return NULL;
 }
 
+
+//BROKEN!
 void _scan(Tobj *pTernary, Tptr root, char *s) {
 
 	Tptr p;
 	Tptr terminal;
-	char** foo = pTernary->searchchar;
-	SV**   val = pTernary->val;
+	AV* keys = pTernary->found_keys;
+	AV* vals = pTernary->found_vals;
+	SV** champ = 0;
 	char* t;
 	int depth = 0;
 	int matchlen = 0;
@@ -268,7 +257,7 @@ void _scan(Tobj *pTernary, Tptr root, char *s) {
 		t = s;
 //printf("in while s (%u), (%s)\n", (char) *t, t);	
 		// loop invariant: successful match in progress, longest
-		// match stored in foo.
+		// match stored in "keys".
 		while(p){
 
 			// Check for space, allowing a successful match to be recorded.
@@ -276,8 +265,7 @@ void _scan(Tobj *pTernary, Tptr root, char *s) {
 			// termination of a pattern, record a successful match.
 			if( *t == ' ' )
 				if(terminal = _bsearch( p, 0 )){
-					foo[pTernary->searchn] = (char *) terminal->eqkid;
-					val[pTernary->searchn] = terminal->val;
+					champ = terminal->keyval;
 					matchlen = depth;
 				}
 			// Continue to match if possible.
@@ -288,9 +276,8 @@ void _scan(Tobj *pTernary, Tptr root, char *s) {
 					// Record a match and return if input string is ended 
 					// and tree indicates termination (t == 0)
 				if(*t == 0){
-					foo[pTernary->searchn] = (char *) p->eqkid;
-					val[pTernary->searchn] = p->val;
-					pTernary->searchn++;
+					av_push(keys, p->keyval[0]);
+					av_push(vals, p->keyval[1]);
 					return;
 				}
 				p = p->eqkid;
@@ -302,7 +289,8 @@ void _scan(Tobj *pTernary, Tptr root, char *s) {
 		// truncate s by length of match or first word...
 		if(matchlen){
 			s += matchlen;
-			pTernary->searchn++;
+			av_push(keys, champ[0]);
+			av_push(vals, champ[1]);
 		}
 		while( (*s != ' ') && (*s != 0) ) s++;
 
@@ -310,21 +298,21 @@ void _scan(Tobj *pTernary, Tptr root, char *s) {
 		matchlen = 0;
 		depth = 0;
 	}
+
 }
   
 
 void _keys(Tobj *pTernary, Tptr p) {
   
-	char** key;
+	AV* keys;
 
 	if (!p) return;
 	_keys(pTernary, p->lokid);
 	if (p->splitchar)
 		_keys(pTernary, p->eqkid);
 	else {
-		key = pTernary->searchchar;
-		key[pTernary->searchn] = (char *) p->eqkid;
-		pTernary->searchn++;
+		keys = pTernary->found_keys;
+		av_push(keys, p->keyval[0]);
 	}
 	_keys(pTernary, p->hikid);
 }
@@ -340,10 +328,9 @@ SV* new(char* class){
 	pTernary->root = 0;  
 	pTernary->terminals = 0;  
 	pTernary->nodes = 0;  
-	pTernary->searchchar = 0;  
-	pTernary->searchn = 0;  
-	pTernary->searchcharn = 0;  
-	pTernary->val = 0;  
+
+		pTernary->found_keys = (AV*) newAV(); 
+		pTernary->found_vals = (AV*) newAV();
 
 	sv_setiv(obj, (IV)pTernary);
 	SvREADONLY_on(obj);
@@ -355,17 +342,15 @@ void DESTROY(SV* obj){
 
 	_cleanup_(pTernary->root);
 
-	if (pTernary->searchcharn > 0){
-		free(pTernary->searchchar);
-	}
 }
 
 
-int insert(SV* obj, char *s, SV* val) {
+int insert(SV* obj, SV* key, SV* val) {
 	Tobj *pTernary = (Tobj*)SvIV(SvRV(obj));
-	char* t = strdup(s);
-	SV* v = newSVsv(val);
-	pTernary->root = _insert(pTernary, pTernary->root, t, t, v);
+	SV* k = newSVsv( key );
+	SV* v = newSVsv( val );
+	char* s = SvPV_nolen( k );
+	pTernary->root = _insert(pTernary, pTernary->root, s, k, v);
 	return 1;
 }
 
@@ -378,16 +363,17 @@ int has(SV* obj, char *s) {
 void keys(SV* obj) {
 	Tobj* pTernary = (Tobj*)SvIV(SvRV(obj));
 	int i;
+	SV** ptr;
 	INLINE_STACK_VARS;
 
 	_malloc(pTernary);
-	pTernary->searchn = 0;
 	_keys(pTernary, pTernary->root);
-	/* now look at pTernary->searchn and pTernary->searchchar */
+	/* now look at pTernary->found_keys */
 
 	INLINE_STACK_RESET;
-    for (i = 0; i < pTernary->searchn; i++) {
-        INLINE_STACK_PUSH(sv_2mortal(newSVpv(pTernary->searchchar[i], 0)));
+    for (i = 0; i <= av_len(pTernary->found_keys); i++) {
+		ptr = av_fetch(pTernary->found_keys, i, 0);
+		INLINE_STACK_PUSH(sv_2mortal(newSVsv(*ptr)));
     }
     INLINE_STACK_DONE;
 
@@ -407,16 +393,18 @@ int terminals(SV* obj){
 void scan(SV* obj, char *s) {
 	Tobj* pTernary = (Tobj*)SvIV(SvRV(obj));
 	int i;
+	SV** ptr;
 	INLINE_STACK_VARS;
 	
 	_malloc(pTernary);
-	pTernary->searchn = 0;
 	_scan(pTernary, pTernary->root, s);
 
 	INLINE_STACK_RESET;
-	for (i = 0; i < pTernary->searchn; i++) {
-		INLINE_STACK_PUSH(sv_2mortal(newSVpv(pTernary->searchchar[i], 0)));
-		INLINE_STACK_PUSH(pTernary->val[i]);
+	for (i = 0; i <= av_len(pTernary->found_keys); i++) {
+		ptr = av_fetch(pTernary->found_keys, i, 0);
+		INLINE_STACK_PUSH(sv_2mortal(newSVsv(*ptr)));
+		ptr = av_fetch(pTernary->found_vals, i, 0);
+		INLINE_STACK_PUSH(sv_2mortal(newSVsv(*ptr)));
 	}
 	INLINE_STACK_DONE;
 

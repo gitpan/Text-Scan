@@ -146,7 +146,7 @@ $ref = new Text::Scan;
 );
  
 for my $term (@termlist) {
-	$ref->insert($term, '');
+	$ref->insert($term, '~');
 }
 
 @longlist = ( 

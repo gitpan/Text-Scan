@@ -56,6 +56,7 @@ ok( $#result == $#answers );
 
 for my $i ( 0..$#answers ){
 	ok($result[$i] eq $answers[$i] );
+	print "($result[$i] cmp $answers[$i])\n";
 }
 
 
