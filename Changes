@@ -12,3 +12,7 @@ Revision history for Perl extension Scan.
 	- Major revision. Prompted by segfault whenever keys in tree < found items in text.
 
 
+0.09  Wed Mar 20 13:55:03 PST 2002
+	- Added wildcard functionality with usewild()
+	- Reduced memory by eliminating separate nodes for null-termination
+	- increased speed 30%

@@ -171,9 +171,6 @@ while( @indices ){
 	}
 }
 
-ok( $ok == $tests );
-
-# print join("\n", @indices), "\n";
-
+ok( $ok, $tests );
 
 

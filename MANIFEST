@@ -14,3 +14,5 @@ t/56_scan.t
 t/57_breakme.t
 t/58_twice.t
 t/60_mindex.t
+t/65_wildcards.t
+t/70_substrings.t

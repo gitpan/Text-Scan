@@ -38,25 +38,25 @@ ok($ref->insert("firewater", "~"));
 ok($ref->nodes(), 37);
 ok($ref->terminals(), 5);
 
-ok($ref->insert("","~"));
-ok($ref->nodes(), 37);
+ok($ref->insert("","~")); # This is a special case, makes a new node.
+ok($ref->nodes(), 38);
 ok($ref->terminals(), 6);
 
 ok($ref->insert("stereo","~"));
-ok($ref->nodes(), 37);
+ok($ref->nodes(), 38);
 ok($ref->terminals(), 7);
 
 ok($ref->insert("","~"));
-ok($ref->nodes(), 37);
+ok($ref->nodes(), 38);
 ok($ref->terminals(), 7);
 
 for ($i = 1;$i < 256;$i++) { $big .= chr($i); }
 ok($ref->insert($big,"~"));
-ok($ref->nodes(), 292);
+ok($ref->nodes(), 293);
 ok($ref->terminals(), 8);
 
 ok($ref->insert($big,"~"));
-ok($ref->nodes(), 292);
+ok($ref->nodes(), 293);
 ok($ref->terminals(), 8);
 
 

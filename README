@@ -39,6 +39,10 @@ SYNOPSIS
             # occurrences of each word
             %indices = $dict->mindex( $document ); 
 
+            # Turn on wildcard scanning. (New in v0.09) 
+            # This can be done anytime. Works for scan() and mindex()
+            $dict->usewild();
+                
 DESCRIPTION
     This module provides facilities for fast searching on arbitrarily long
     texts with arbitrarily many search keys. The basic object behaves
@@ -70,6 +74,13 @@ DESCRIPTION
     chore of tokenizing the target would be mitigated by pattern matching
     capabilities (hmm..)
 
+    NEW in v 0.09: Wildcards! A limited wildcard functionality is available.
+    call usewild() to turn it on. Thereafter any asterisk (*) will be
+    treated as "one or more non-space characters". Once this function is
+    turned on, the scan will be approximately 50% slower than with literal
+    strings. If you include '*' in any key without calling usewild(), the
+    '*' will be treated literally.
+
 TO DO
     Some obvious things have not been implemented. Deletion of key/values,
     patterns as keys (kind of a big one), the abovementioned elimination of
@@ -78,29 +89,29 @@ TO DO
 
 CREDITS
     This code is heavily borrowed from both Bentley & Sedgwick, and Leon
-    Brocard's additions to it for `Tree::Ternary_XS'. The differences are in
-    the modified search algorothm to allow for scanning, the storage of
+    Brocard's additions to it for "Tree::Ternary_XS". The differences are in
+    the modified search algorithm to allow for scanning, the storage of
     keys/values, and an extra node-rotation for gradual self-adjusting
     optimization to the statistical characteristics of the target text.
 
-    Many test scripts come directly from Rogaski's `Tree::Ternary' module.
+    Many test scripts come directly from Rogaski's "Tree::Ternary" module.
 
-    The C code interface was created using Ingerson's `Inline'.
+    The C code interface was created using Ingerson's "Inline".
 
 SEE ALSO
-    `Bentley & Sedgwick "Fast Algorithms for Sorting and Searching Strings",
-    Proceedings ACM-SIAM (1997)'
+    "Bentley & Sedgwick "Fast Algorithms for Sorting and Searching Strings",
+    Proceedings ACM-SIAM (1997)"
 
-    `Bentley & Sedgewick "Ternary Search Trees", Dr Dobbs Journal (1998)'
+    "Bentley & Sedgewick "Ternary Search Trees", Dr Dobbs Journal (1998)"
 
-    `Sleator & Tarjan "Self-Adjusting Binary Search Trees", Journal of the
-    ACM (1985)'
+    "Sleator & Tarjan "Self-Adjusting Binary Search Trees", Journal of the
+    ACM (1985)"
 
-    `Tree::Ternary'
+    "Tree::Ternary"
 
-    `Tree::Ternary_XS'
+    "Tree::Ternary_XS"
 
-    `Inline'
+    "Inline"
 
 COPYRIGHT
     Copyright 2001 Ira Woodhead, H5 Technologies. All rights reserved.
