@@ -5,14 +5,14 @@ use strict;
 use warnings;
 
 use vars qw($VERSION);
-$VERSION = '0.03';
+$VERSION = '0.04';
 
 # The following are for debugging only
 #use ExtUtils::Embed;
 #use Inline C => Config => CCFLAGS => "-g"; # add debug stubs to C lib
 
 use Inline C => 'DATA',
-			VERSION => '0.03',
+			VERSION => '0.04',
 			NAME => 'Text::Scan';
 
 
@@ -39,7 +39,7 @@ Text::Scan - Fast search for very large numbers of keys in a body of text.
 
 	# load the dictionary with keys and values
 	# (values can be any scalar, keys must be strings)
-	while ($key, $val) = each %terms ){
+	while( ($key, $val) = each %terms ){
 		$dict->insert( $key, $val );
 	}
 
@@ -60,13 +60,18 @@ Text::Scan - Fast search for very large numbers of keys in a body of text.
 
 =head1 DESCRIPTION
 
-This module provides facilities for fast searching on arbitrarily long texts with arbitrarily many search keys. The basic object behaves somewhat like a perl hash, except that you can retrieve based on a superstring of any keys stored. Simply scan a string as shown above and you will get back a perl hash (or list) of all keys found in the string (along with associated values). Longest-first order is observed (as in perl regular expressions). 
+This module provides facilities for fast searching on arbitrarily long texts with arbitrarily many search keys. The basic object behaves somewhat like a perl hash, except that you can retrieve based on a superstring of any keys stored. Simply scan a string as shown above and you will get back a perl hash (or list) of all keys found in the string (along with associated values). Longest/first order is observed (as in perl regular expressions).
+
+IMPORTANT: As of this version, a B<single space> is used as a delimiter for purposes of recognizing key boundaries. That's right, there is a bias in favor of processing natural language! In other words, if 'my dog' is a key and 'my dogs bite' is the text, 'my dog' will B<not> be recognized. I plan to make this more configurable in the future, to have a different delimiter or none at all. For now, recognize that the key 'drunk' will not be found in the text 'gedrunk' or 'drunken' (or 'drunk.' for that matter). Properly tokenizing your corpus is essential. I know there is probably a better solution to the problem of substrings, and if anyone has suggestions, by all means contact me.
+
 
 =head1 CREDITS
 
-Except for the actual scanning part, plus the node-rotation for self-adjusting optimization, this code is heavily borrowed from both Bentley & Sedgwick and Leon Brocard's additions to it for C<Tree::Ternary_XS>. The C code interface was created using Ingerson's C<Inline>.
+Except for the actual scanning part, plus the node-rotation for self-adjusting optimization, this code is heavily borrowed from both Bentley & Sedgwick and Leon Brocard's additions to it for C<Tree::Ternary_XS>. 
 
 Many test scripts come directly from Rogaski's C<Tree::Ternary> module.
+
+The C code interface was created using Ingerson's C<Inline>.
 
 =head1 SEE ALSO
 
@@ -79,6 +84,14 @@ C<Sleator & Tarjan "Self-Adjusting Binary Search Trees", Journal of the ACM (198
 C<Tree::Ternary>
 
 C<Tree::Ternary_XS>
+
+C<Inline>
+
+=head1 COPYRIGHT
+
+Copyright 2001 Ira Woodhead, H5 Technologies. All rights reserved.
+
+This library is free software; you can redistribute it and/or modify it under the same terms as Perl itself
 
 =head1 AUTHOR
 
@@ -155,15 +168,15 @@ Tptr _insert(Tobj *pTernary, Tptr p, char *s, char *insertstr, SV* v) {
 	return p;
 }
 
-void _cleanup(Tptr p) {
+void _cleanup_(Tptr p) {
 	if (p) {
-		_cleanup(p->lokid);
+		_cleanup_(p->lokid);
 		if (p->splitchar) {
-			_cleanup(p->eqkid);
+			_cleanup_(p->eqkid);
 		} else {
 			free(p->eqkid); /* It's just a string, free the memory */
 		}
-		_cleanup(p->hikid);
+		_cleanup_(p->hikid);
 		free(p);  
 	}
 }
@@ -184,6 +197,35 @@ int _search(Tptr root, char *s) {
 			p = p->hikid;
 	}
 	return 0;
+}
+
+
+// Balance the tree as we go, for optimal searching
+void _rotate(Tptr grandparent, Tptr parent, Tptr child){
+	
+	if( grandparent->hikid == parent ){
+		if( parent->hikid == child ){
+			parent->hikid = child->lokid;
+			child->lokid  = parent;
+		}
+		else if ( parent->lokid == child ){
+			parent->lokid = child->hikid;
+			child->hikid  = parent;
+		}
+		grandparent->hikid = child;
+	}
+	else if( grandparent->lokid == parent ){
+		if( parent->hikid == child ){
+			parent->hikid = child->lokid;
+			child->lokid  = parent;
+		}
+		else if ( parent->lokid == child ){
+			parent->lokid = child->hikid;
+			child->hikid  = parent;
+		}
+		grandparent->lokid = child;
+	} 
+
 }
 
 // Return the node representing the char s, if it exists, from this btree.
@@ -285,33 +327,7 @@ void _keys(Tobj *pTernary, Tptr p) {
 	_keys(pTernary, p->hikid);
 }
 
-// Balance the tree as we go, for optimal searching
-void _rotate(Tptr grandparent, Tptr parent, Tptr child){
-	
-	if( grandparent->hikid == parent ){
-		if( parent->hikid == child ){
-			parent->hikid = child->lokid;
-			child->lokid  = parent;
-		}
-		else if ( parent->lokid == child ){
-			parent->lokid = child->hikid;
-			child->hikid  = parent;
-		}
-		grandparent->hikid = child;
-	}
-	else if( grandparent->lokid == parent ){
-		if( parent->hikid == child ){
-			parent->hikid = child->lokid;
-			child->lokid  = parent;
-		}
-		else if ( parent->lokid == child ){
-			parent->lokid = child->hikid;
-			child->hikid  = parent;
-		}
-		grandparent->lokid = child;
-	} 
 
-}
 
 
 SV* new(char* class){
@@ -335,7 +351,7 @@ SV* new(char* class){
 void DESTROY(SV* obj){
 	Tobj* pTernary = (Tobj*)SvIV(SvRV(obj));
 
-	_cleanup(pTernary->root);
+	_cleanup_(pTernary->root);
 
 	if (pTernary->searchcharn > 0){
 		free(pTernary->searchchar);

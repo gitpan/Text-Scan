@@ -1,0 +1,87 @@
+NAME
+    Text::Scan - Fast search for very large numbers of keys in a body of
+    text.
+
+SYNOPSIS
+            use Text::Scan;
+
+            $dict = new Text::Scan;
+
+            %terms = ( dog  => 'canine',
+                       bear => 'ursine',
+                       pig  => 'porcine' );
+
+            # load the dictionary with keys and values
+            # (values can be any scalar, keys must be strings)
+            while( ($key, $val) = each %terms ){
+                    $dict->insert( $key, $val );
+            }
+
+            # Scan a document for matches
+            %found = $dict->scan( $document );
+
+            # Or, if you need to count number of occurrences of any given 
+            # key, use an array. This will give you a countable flat list
+            # of key => value pairs.
+            @found = $dict->scan( $document );
+
+            # Check for membership ($val is true)
+            $val = $dict->has('pig');
+
+            # Retrieve all keys
+            @keys = $dict->keys();
+
+DESCRIPTION
+    This module provides facilities for fast searching on arbitrarily long
+    texts with arbitrarily many search keys. The basic object behaves
+    somewhat like a perl hash, except that you can retrieve based on a
+    superstring of any keys stored. Simply scan a string as shown above and
+    you will get back a perl hash (or list) of all keys found in the string
+    (along with associated values). Longest/first order is observed (as in
+    perl regular expressions).
+
+    IMPORTANT: As of this version, a single space is used as a delimiter for
+    purposes of recognizing key boundaries. That's right, there is a bias in
+    favor of processing natural language! In other words, if 'my dog' is a
+    key and 'my dogs bite' is the text, 'my dog' will not be recognized. I
+    plan to make this more configurable in the future, to have a different
+    delimiter or none at all. For now, recognize that the key 'drunk' will
+    not be found in the text 'gedrunk' or 'drunken' (or 'drunk.' for that
+    matter). Properly tokenizing your corpus is essential. I know there is
+    probably a better solution to the problem of substrings, and if anyone
+    has suggestions, by all means contact me.
+
+CREDITS
+    Except for the actual scanning part, plus the node-rotation for
+    self-adjusting optimization, this code is heavily borrowed from both
+    Bentley & Sedgwick and Leon Brocard's additions to it for
+    `Tree::Ternary_XS'.
+
+    Many test scripts come directly from Rogaski's `Tree::Ternary' module.
+
+    The C code interface was created using Ingerson's `Inline'.
+
+SEE ALSO
+    `Bentley & Sedgwick "Fast Algorithms for Sorting and Searching Strings",
+    Proceedings ACM-SIAM (1997)'
+
+    `Bentley & Sedgewick "Ternary Search Trees", Dr Dobbs Journal (1998)'
+
+    `Sleator & Tarjan "Self-Adjusting Binary Search Trees", Journal of the
+    ACM (1985)'
+
+    `Tree::Ternary'
+
+    `Tree::Ternary_XS'
+
+    `Inline'
+
+COPYRIGHT
+    Copyright 2001 Ira Woodhead, H5 Technologies. All rights reserved.
+
+    This library is free software; you can redistribute it and/or modify it
+    under the same terms as Perl itself
+
+AUTHOR
+    Ira Woodhead, bunghole@pobox.com
+

@@ -1,6 +1,7 @@
 Changes
 MANIFEST
 Makefile.PL
+README
 Scan.pm
 t/00_load.t
 t/02_new.t
