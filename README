@@ -40,20 +40,31 @@ SYNOPSIS
             # (new in v0.10)
             @vals = $dict->values();
             # @vals is ( canine, ursine, porcine )
-        
+
+            # Get back everything you inserted
+            %everything = $dict->dump();
+
             # "mindex"
             # Like perl's index() but with multiple patterns (new in v0.07)
             # you can scan for the starting positions of terms.
             @indices = $dict->mindex( $document );
             # @indices is ( dog => 4, bear => 16, dog => 29 ) 
 
-            # The hash context yeilds the position of the last occurrences 
+            # The hash context yields the position of the last occurrences 
             # of each word 
             %indices = $dict->mindex( $document ); 
             # %indices is ( dog => 26, bear => 16 )
 
-            # Turn on wildcard scanning. (New in v0.09) 
-            # This can be done anytime. Works for scan() and mindex()
+            # multiscan() (>= v0.23)
+            # Retrieves everything scan() and mindex() does, in the form
+            # of an array of references. Each reference points to a list
+            # of (key, index, value)
+            @result = $dict->multiscan($document);
+            # @result is ([dog, 4, canine], [bear, 16, ursine], [dog, 29, canine])
+
+            # Turn on wildcard scanning. (>= v0.09) 
+            # This can be done anytime. Works for scan() and mindex(). Wildcards
+            # encompass any number of non-single-space-equivalent chars.
             $dict->usewild();
 
             # Save a dictionary, then restore it. (serialize and restore new in v0.14)
@@ -63,39 +74,71 @@ SYNOPSIS
             $dict->serialize("dict_name");
             $dict->restore("dict_name");
 
+            # Place a global char equivalency class into effect. This matches all
+            # these characters as if they were the same. (v0.17)
+            $dict->charclass(".:;,?");
+            $dict->insert("What?", "What?");
+            @found = $dict->scan("Err... What, something wrong?");
+            # now @found is ( "What," => "What?" );
+
+            # Scan case-insensitively. This must be called before any insertions.
+            $dict->ignorecase();
+
+            # Set a class of chars to be the boundaries of any match, 
+            # such that the chars immediately before the beginning and after the
+            # ending of a match have to be in this class. Default is the single
+            # space. (beginning and ending of string always count as bounds)
+            # This can be called at any time, and supercedes any previous calls.
+            $dict->boundary(".? ");
+
+            # Ignore certain chars. You can define a class of chars that the
+            # dictionary should pretend do not exist. You must call this before
+            # any insertions.
+            $dict->ignore("\n\r<>()");
+
 DESCRIPTION
-    This module provides facilities for fast searching on arbitrarily long
-    texts with very many search keys. The basic object behaves somewhat like
-    a perl hash, except that you can retrieve based on a superstring of any
-    keys stored. Simply scan a string as shown above and you will get back a
-    perl hash (or list) of all keys found in the string (along with
-    associated values (or positions if you use mindex() instead of scan(),
-    see examples above)). All keys present in the text are returned.
+    This module provides facilities for fast searching on strings with very
+    many search keys. The basic object behaves somewhat like a perl hash,
+    except that you can retrieve based on a superstring of any keys stored.
+    Simply scan a string as shown above and you will get back a perl hash
+    (or list) of all keys found in the string (along with associated values
+    and/or positions). All keys present in the text are returned.
 
-    NOTE: This is a behavioral change from previous versions where keys
-    could never overlap. Now they may overlap and still be detected.
+    There are several ways to influence the behavior of the match, chiefly
+    by the use of several types of global character classes. These are
+    different from regular expression char classes, in that they apply to
+    the entire text and for all keys. These consist of the "ignore" class,
+    the "boundary" class, and any user-defined classes.
 
-    IMPORTANT: A single space is used as a delimiter for purposes of
-    recognizing key boundaries. That's right, there is a bias in favor of
-    processing natural language! In other words, if 'my dog' is a key and
-    'my dogs bite' is the text, 'my dog' will not be recognized. I plan to
-    make this more configurable in the future, to have a different delimiter
-    or none at all. For now, recognize that the key 'drunk' will not be
-    found in the text 'gedrunk' or 'drunken' (or 'drunk.' for that matter).
-    Properly tokenizing your corpus is essential. I know there is probably a
-    better solution to the problem of substrings, and if anyone has
-    suggestions, by all means contact me.
+    Using "ignore" characters you can have the scan pretend a char in the
+    text simply does not exist. This is useful if you want to avoid
+    tokenizing your text. So for instance, if the period '.' is in your
+    "ignore" class, the text will be treated exactly as if all periods had
+    been deleted.
 
-COMMENTARY
-    What I am leaning toward is simply having no implicit delimiter at all,
-    and relying on the programmer to use a chosen delimiter when inserting
-    keys, then tokenizing the target text properly so that the delimiter is
-    present at boundaries as defined by your application. This would leave
-    you free to have no delimiter if you really want "drunk" to match
-    "gedrunk", "drunken", "drunk." etc. The chore of tokenizing the target
-    would be mitigated by pattern matching capabilities (hmm..)
+    To define what characters may count as the delimiter of any match
+    (single space by default) you can use the "boundary" class. For instance
+    this way you can count punctuation as a boundary, and phrases bounded at
+    the end by punctuation will match.
+
+    Any user-defined character classes can be used to count different chars
+    as the same. For instance this is used internally to implement
+    case-insensitive matching.
 
 NEW
+    In v 0.19: "boundary" character class defines legal boundary characters
+    for all matches. Default is single space for backward compatibility.
+
+    In v 0.18: Global "ignore" character classes. This, along with general
+    global char classes and case-insensitivity, should allow you to
+    eliminate most preprocessing.
+
+    In v 0.17: Global character classes, see example above. Also thereby
+    case-insensitivity.
+
+    In v 0.16: Now all patterns present in the text are returned regardless
+    of where they begin or end.
+
     In v 0.13: A more-or-less complete rewrite of Text::Scan uses a more
     traditional finite-state machine rather than a ternary trie for the
     basic data structure. This results in an average 20% savings in memory
@@ -168,5 +211,5 @@ COPYRIGHT
     under the same terms as Perl itself
 
 AUTHOR
-    Ira Woodhead, ira at foobox dot com
+    Ira Woodhead, textscan at sweetpota dot to
 

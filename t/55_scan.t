@@ -61,6 +61,11 @@ for my $term (@termlist) {
 	"telephone", "telephone"
 );
 
+
+#print STDERR join "\n", $ref->values();
+#print STDERR "\n\n";
+
+my @result = ();
 for my $line ( @texts ){
 	push @result, $ref->scan( $line );
 }

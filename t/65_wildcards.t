@@ -4,7 +4,7 @@
 use Test;
 use Text::Scan;
 
-BEGIN { plan tests => 15 }
+BEGIN { plan tests => 8 }
 
 $ref = new Text::Scan;
 $ref->usewild();
@@ -27,11 +27,11 @@ for my $term (@termlist) {
 	$ref->insert($term, '');
 }
 
-@longlist = ( 
+$line = ( 
 	"any business risk in the pajamas are in the party tomorrow with words to the contrary form of an ice weasel telephone tirewater in my soup jackass"
 );
 
-@answers = ( 
+%answers = ( 
 	"pajamas are in", '',
 	"pajamas are in the party", '',
 	"words", '',
@@ -41,20 +41,18 @@ for my $term (@termlist) {
 	"tirewater in my soup", ''
 );
 
-for my $line ( @longlist ){
-	push @result, $ref->scan( $line );
-}
+%result = $ref->scan( $line );
 
-# @result should be exactly @answers.
+# %result should be exactly %answers.
 
-print "results contain ", scalar @result, " items\n";
-print join("\n", @result), "\n";
+print "results contain ", scalar keys %result, " items\n";
+print join("\n", keys %result), "\n";
 
-ok( $#result == $#answers );
+ok( scalar keys %result, scalar keys %answers );
 
-for my $i ( 0..$#answers ){
-	ok($result[$i] eq $answers[$i] );
-	print "($result[$i] cmp $answers[$i])\n";
+for my $i ( keys %answers ){
+	ok( exists $result{$i} );
+	print "$i\n";
 }
 
 

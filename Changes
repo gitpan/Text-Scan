@@ -42,3 +42,20 @@ Revision history for Perl extension Text::Scan.
 0.16 Tue Sep 30 15:09:23 PDT 2003
 	- Now longer patterns do not clobber shorter patterns having the same prefix.
 
+0.17 Wed Oct  1 14:30:06 PDT 2003
+	- Uses character classes "charclass()" and thus case-insensitivity "ignorecase()"
+
+0.18 Wed Oct  1 19:39:09 PDT 2003
+	- Uses global ignore char class "ignore()"
+
+0.19 Thu Oct  9 19:02:22 PDT 2003
+	- Uses global boundary char class "boundary()" to define match delimiters
+
+0.21 Wed Mar 10 11:28:26 PST 2004
+	- Changed wildcard code to test for single space equivalent within a wild match, rather than boundary char. Boundary chars inside wildcard matches botched the match.
+0.22 Fri Mar 12 11:47:53 PST 2004
+	- Fixed bug causing wildcards at eof to continue reading past string.
+
+0.23 Tue Apr  6 13:29:22 PDT 2004
+	- Scanning code major rewrite. New functions: multiscan(), dump().
+
