@@ -26,7 +26,7 @@ for my $word (@wordlist) {
 	$ref->insert($word, "~");
 }
 
-@result = $ref->keys();
+@result = sort $ref->keys();
 
 ok($result[0], 'banana');
 ok($result[1], 'bananas');
@@ -44,7 +44,7 @@ ok($result[11], 'worms');
 
 # Try that again
 
-@result = $ref->keys();
+@result = sort $ref->keys();
 
 ok($result[0], 'banana');
 ok($result[1], 'bananas');
@@ -63,7 +63,7 @@ ok($result[11], 'worms');
 
 # How about three times?
 
-@result = $ref->keys();
+@result = sort $ref->keys();
 
 ok($result[0], 'banana');
 ok($result[1], 'bananas');

@@ -3,7 +3,7 @@
 use Test;
 use Text::Scan;
 
-BEGIN { plan tests => 17 }
+BEGIN { plan tests => 19 }
 
 $ref = new Text::Scan;
 
@@ -24,24 +24,36 @@ $ref = new Text::Scan;
 	"telephone",
 	"telephone me"
 );
- 
-my $i = 0;
+
+
 for my $term (@termlist) {
-	$ref->insert($term, $i++);
+	$ref->insert($term, $term);
 }
 
-@longlist = ( 
-	"banana boat in the mist", 1,
-	"pajamas are in the party", 3,
-	"pajamas are in the party at my house", 4,
-	"words are words", 6,
-	"form of an ice waterslide", 8,
-	"tirewater in my soup", 10,
-	"tidewater shellfish", 12,
-	"telephone", 13
+@texts = ( 
+	"banana boat in the mist",
+	"pajamas are in the party",
+	"pajamas are in the party at my house",
+	"words are words",
+	"form of an ice waterslide",
+	"tirewater in my soup",
+	"tidewater shellfish",
+	"telephone",
 );
 
-for my $line ( @longlist ){
+@longlist = ( 
+	"banana boat in the mist", "banana boat in the mist",
+	"pajamas are in the party", "pajamas are in the party",
+	"pajamas are in the party at my house", "pajamas are in the party at my house",
+	"words are words", "words are words",
+	"words", "words",
+	"form of an ice waterslide", "form of an ice waterslide",
+	"tirewater in my soup", "tirewater in my soup",
+	"tidewater shellfish", "tidewater shellfish",
+	"telephone", "telephone",
+);
+
+for my $line ( @texts ){
 	push @result, $ref->scan( $line );
 }
 
@@ -50,7 +62,7 @@ for my $line ( @longlist ){
 
 ok( $#result, $#longlist );
 
-for my $i ( 0..$#longlist ){
+for my $i ( 0..$#result ){
 #print "$result[$i] == $longlist[$i]\n";
 	ok($result[$i], $longlist[$i] );
 }

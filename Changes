@@ -28,3 +28,8 @@ Revision history for Perl extension Text::Scan.
 	- Fixed *another* bug causing spurious text-skipping
 	- Fixed a much smaller memory leak
 	- added diagnostic function btrees(), count of used eqkid links.
+
+0.13  Fri May 31 18:51:47 PDT 2002
+	- Rewrote basic data structure to be a Finite State Machine rather than Ternary Trie. Speed savings 10%, memory savings 20%, simpler to grasp/debug.
+
+

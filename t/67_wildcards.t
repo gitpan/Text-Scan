@@ -4,7 +4,7 @@
 use Test;
 use Text::Scan;
 
-BEGIN { plan tests => 3 }
+BEGIN { plan tests => 5 }
 
 $ref = new Text::Scan;
 $ref->usewild();
@@ -12,6 +12,9 @@ $ref->usewild();
 @termlist = ( 
 	"marine corps expedition",
 	"marine * * forces",
+	"mso 456 us*",
+	"mso 4* * * mso 5*",
+
 );
  
 for my $term (@termlist) {
@@ -19,11 +22,13 @@ for my $term (@termlist) {
 }
 
 @longlist = ( 
-	"bla marine corps expeditionary forces bla"
+	"bla marine corps expeditionary forces bla",
+	"bla bla mso 456 uss adroit mso 509 bla bla",
 );
 
 @answers = ( 
 	"marine corps expeditionary forces", 0,
+	"mso 456 uss adroit mso 509", 0,
 );
 
 for my $line ( @longlist ){

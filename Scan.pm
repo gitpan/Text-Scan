@@ -5,7 +5,7 @@ use strict;
 use warnings;
 
 use vars qw($VERSION);
-$VERSION = '0.12';
+$VERSION = '0.13';
 
 # The following are for debugging only
 #use ExtUtils::Embed;
@@ -13,7 +13,7 @@ $VERSION = '0.12';
 #use Inline Config => CLEAN_AFTER_BUILD => 0; # cp _Inline/build/Text/Scan/Scan.xs .
 
 use Inline C => 'DATA',
-			VERSION => '0.12',
+			VERSION => '0.13',
 			NAME => 'Text::Scan';
 
 
@@ -21,6 +21,7 @@ use Inline C => 'DATA',
 1;
 
 __DATA__
+
 
 =pod
 
@@ -77,19 +78,40 @@ Text::Scan - Fast search for very large numbers of keys in a body of text.
 		
 =head1 DESCRIPTION
 
-This module provides facilities for fast searching on arbitrarily long texts with arbitrarily many search keys. The basic object behaves somewhat like a perl hash, except that you can retrieve based on a superstring of any keys stored. Simply scan a string as shown above and you will get back a perl hash (or list) of all keys found in the string (along with associated values (or positions if you use mindex() instead of scan())). Longest/first order is observed during matching (meaning, each subsequent match begins at the end of the last successful match, and matches are "greedy", as in perl regular expressions).
+This module provides facilities for fast searching on arbitrarily long texts with very many search keys. The basic object behaves somewhat like a perl hash, except that you can retrieve based on a superstring of any keys stored. Simply scan a string as shown above and you will get back a perl hash (or list) of all keys found in the string (along with associated values (or positions if you use mindex() instead of scan(), see examples above)). All keys present in the text are returned, except in the case where one or more keys are present but are prefixes of another longer key. In these cases only the longest key is returned. 
 
-IMPORTANT: As of this version, a B<single space> is used as a delimiter for purposes of recognizing key boundaries. That's right, there is a bias in favor of processing natural language! In other words, if 'my dog' is a key and 'my dogs bite' is the text, 'my dog' will B<not> be recognized. I plan to make this more configurable in the future, to have a different delimiter or none at all. For now, recognize that the key 'drunk' will not be found in the text 'gedrunk' or 'drunken' (or 'drunk.' for that matter). Properly tokenizing your corpus is essential. I know there is probably a better solution to the problem of substrings, and if anyone has suggestions, by all means contact me.
+NOTE: This is a behavioral change from previous versions where keys could never overlap. Now they may overlap and still be detected.
 
-To be honest, what I am leaning toward is simply having no implicit delimiter at all, and relying on the programmer to use a chosen delimiter when inserting keys, then tokenizing the target text properly so that the delimiter is present at boundaries as defined by your application. This would leave you free to have no delimiter if you really want "drunk" to match "gedrunk", "drunken", "drunk." etc. The chore of tokenizing the target would be mitigated by pattern matching capabilities (hmm..)
+IMPORTANT: A B<single space> is used as a delimiter for purposes of recognizing key boundaries. That's right, there is a bias in favor of processing natural language! In other words, if 'my dog' is a key and 'my dogs bite' is the text, 'my dog' will B<not> be recognized. I plan to make this more configurable in the future, to have a different delimiter or none at all. For now, recognize that the key 'drunk' will not be found in the text 'gedrunk' or 'drunken' (or 'drunk.' for that matter). Properly tokenizing your corpus is essential. I know there is probably a better solution to the problem of substrings, and if anyone has suggestions, by all means contact me.
 
-NEW in v 0.09: Wildcards! A limited wildcard functionality is available. call usewild() to turn it on. Thereafter any asterisk (*) will be treated as "one or more non-space characters". Once this function is turned on, the scan will be approximately 50% slower than with literal strings. If you include '*' in any key without calling usewild(), the '*' will be treated literally.
+=head1 COMMENTARY
+
+What I am leaning toward is simply having no implicit delimiter at all, and relying on the programmer to use a chosen delimiter when inserting keys, then tokenizing the target text properly so that the delimiter is present at boundaries as defined by your application. This would leave you free to have no delimiter if you really want "drunk" to match "gedrunk", "drunken", "drunk." etc. The chore of tokenizing the target would be mitigated by pattern matching capabilities (hmm..)
+
+=head1 NEW
+
+In v 0.13: A more-or-less complete rewrite of Text::Scan uses a more traditional finite-state machine rather than a ternary trie for the basic data structure. This results in an average 20% savings in memory and 10% savings in runtime, besides being much simpler to implement, thus less prone to bugs.
+
+In v 0.09: Wildcards! A limited wildcard functionality is available. call usewild() to turn it on. Thereafter any asterisk (*) followed by a space (' ') will be treated as "zero or more non-space characters". Once this function is turned on, the scan will be approximately 50% slower than with literal strings. If you include '*' in any key without calling usewild(), the '*' will be treated literally.
 
 =head1 TO DO
 
-Some obvious things have not been implemented. Deletion of key/values, patterns as keys (kind of a big one), the abovementioned elimination of the default boundary marker ' ', possibility of calling scan() with a filehandle instead of a string scalar.
+Some obvious things have not been implemented. Deletion of key/values, patterns as keys (kind of a big one), the abovementioned elimination of the default boundary marker ' ', possibility of calling scan() with a filehandle instead of a string scalar. There is also an optimization I've been thinking about, call it "continuation reentrancy", that would greatly speed up matches on literal strings by never examining the same input char more than once.
+
+Another optimization that might help is a transition reordering scheme for the sequential searches within states. This was shown by Sleator to reduce the strict number of comparisons over time.
 
 =head1 CREDITS
+
+Chad, Tara, Dan, Kim, love ya sweethearts.
+
+Many test scripts come directly from Rogaski's C<Tree::Ternary> module.
+
+The C code interface was created using Ingerson's C<Inline>.
+
+
+=head1 OLD CREDITS (versions prior to 0.13)
+
+The basic data structure used to be a ternary trie, but I changed it starting with version 0.13 to a finite state machine, for the sake of performance and simplicity. However, it was a lot of fun working with these ideas, so I'm including the old credits here.
 
 The basic framework for this code is borrowed from both Bentley & Sedgwick, and Leon Brocard's additions to it for C<Tree::Ternary_XS>. The differences are in the modified search algorithm to allow for scanning, the storage of keys/values, and an extra node-rotation for gradual self-adjusting optimization to the statistical characteristics of the target text.
 
@@ -113,212 +135,217 @@ C<Inline>
 
 =head1 COPYRIGHT
 
-Copyright 2001 Ira Woodhead, H5 Technologies. All rights reserved.
+Copyright 2001, 2002 Ira Woodhead. All rights reserved.
 
 This library is free software; you can redistribute it and/or modify it under the same terms as Perl itself
 
 =head1 AUTHOR
 
-Ira Woodhead, ira@h5technologies.com
+Ira Woodhead, ira@foobox.com
 
 =cut
+
 
 __C__
 
 
-typedef struct tnode *Tptr;
-
-typedef struct tnode {
+// The transition. There are no explicit states, just linked
+// lists of transitions.
+typedef struct TRANS *trans;
+typedef struct TRANS {
 	char splitchar;
-	Tptr lokid, eqkid, hikid;
-	SV* keyval;
-} Tnode;
+	trans next_trans;
+	trans next_state;
+} Trans;
 
-typedef struct tobj {
-	Tptr root;
+typedef struct FSM *fsm;
+typedef struct FSM {
+	trans root;
 	int terminals;
-	int nodes;
-	int btrees;
+	int transitions;
+	int states;
 	int maxpath;
 	AV* found_keys;
 	AV* found_vals;
 	bool use_wildcards;
-} Tobj;
+} Fsm;
 
 
+// A link in a list of pending matches, for use with wildcards.
 typedef struct pmatch *pmPtr;
-typedef struct pmatch { // A link in a list of pending matches.
+typedef struct pmatch { 
 	int depth; 
 	pmPtr next;
-	Tptr p;
+	trans p;
 	char *t;
 	bool inWild;
 } pMatch;
 
-_malloc(Tobj *pTernary) {
-	av_clear(pTernary->found_keys);
-	av_clear(pTernary->found_vals);
+
+_malloc(fsm m) {
+	av_clear(m->found_keys);
+	av_clear(m->found_vals);
 }
 
-Tptr _insert_(Tobj *pTernary, Tptr p, char *s, SV* val) {
-	if (p == 0) {
-		p = (Tptr) malloc(sizeof(Tnode));
-		p->splitchar = *s;
-		p->lokid = p->eqkid = p->hikid = (Tptr) p->keyval = (SV*) 0;
-		pTernary->nodes++;
+
+// Place the top transition where it belongs (in the order \0,*,[others])
+trans _demote(trans parent){
+	
+	trans child, top = parent;
+	
+	if( !(child = parent->next_trans) ) return top;
+	if( !parent->splitchar ) return top;
+	if( !child->splitchar ){
+		parent->next_trans = child->next_trans;
+		child->next_trans = parent;
+		top = child;
 	}
-	if (*s < p->splitchar)
-		p->lokid = _insert_(pTernary, p->lokid, s, val);
-	else if (*s == p->splitchar) {
-		if (*(s+1) == 0 || *s == 0) { //*s==0 special case for empty str
-			if (!p->keyval) {
-				pTernary->terminals++;
-			}
-			else sv_2mortal(p->keyval);
-			p->keyval = val;
-		}
-		else {
-			if(!p->eqkid) pTernary->btrees++;
-			p->eqkid = _insert_(pTernary, p->eqkid, ++s, val);
-		}
-	} else
-		p->hikid = _insert_(pTernary, p->hikid, s, val);
+	if( !(child = parent->next_trans) ) return top;
+
+	if( child->splitchar == '*' ){
+		parent->next_trans = child->next_trans;
+		child->next_trans = parent;
+		if( top != parent ) top->next_trans = child;
+		else top = child;
+	}
+	return top;
+}
+
+
+trans _insert_(fsm m, trans p, char *s, SV* val) {
+	
+	trans t = p;
+	
+	// going to be a new state with one transition.
+	if (p == 0 && *s) m->states++;
+
+	// search for *s in transition list (state) t
+	while(t){
+		if(*s == t->splitchar) break;
+		else t = t->next_trans;
+	}
+
+	// *s transition not in current state? Make a new one, place
+	// it at the top of the list. (but keep terminals, wilds at top)
+	if(!t){
+		m->transitions++;
+		t = (trans) malloc(sizeof(Trans));
+		t->splitchar = *s;
+		t->next_state = 0;
+		t->next_trans = p;
+		// flip terminal state and/or wildcard p to top
+		p = _demote(t); 
+	}
+
+	// continue inserting the rest of the string. If there is no more
+	// string, place the SV* val into this termination transition.
+	if(*s)
+		t->next_state = _insert_(m, t->next_state, ++s, val);
+	else {
+		if(t->next_state) 
+			sv_2mortal((SV*)t->next_state);
+		else
+			m->terminals++;
+		t->next_state = (trans) val;
+	}
 
 	return p;
 }
 
-void _cleanup_(Tptr p) {
+
+
+void _cleanup_(trans p) {
+
 	if (p) {
 			
-		_cleanup_(p->lokid);
-		
-		if (p->splitchar)
-			_cleanup_(p->eqkid);
-		
-		_cleanup_(p->hikid);
-		
-		if(p->keyval) sv_2mortal(p->keyval);
+		_cleanup_(p->next_trans);
 
-		free(p);  
+		if(!p->splitchar){
+			sv_2mortal( (SV*) p->next_state);
+			free(p);
+		}
+		else 
+			_cleanup_(p->next_state);
 	}
 }
 
 
-int _search(Tptr root, char *s) {
-	Tptr p;
-	p = root;
+int _search(trans root, char *s) {
+
+	trans p = root;
 	while (p) {
-		if (*s < p->splitchar)
-			p = p->lokid;
-		else if (*s == p->splitchar)  {
-			if (*(++s) == 0 && p->keyval) 
-				return 1;
-			p = p->eqkid;
-		}
-		else
-			p = p->hikid;
+		while(p)
+			if(p->splitchar == *s) break;
+			else p = p->next_trans;
+		if(!p) return 0;
+		if(!p->splitchar) return 1;
+		p = p->next_state;
+		s++;
 	}
 	return 0;
 }
 
 
-// Balance the tree as we go, for optimal searching
-void _rotate(Tptr grandparent, Tptr parent, Tptr child){
-	
-	if( grandparent->hikid == parent ){
-		if( parent->hikid == child ){
-			parent->hikid = child->lokid;
-			child->lokid  = parent;
-		}
-		else if ( parent->lokid == child ){
-			parent->lokid = child->hikid;
-			child->hikid  = parent;
-		}
-		grandparent->hikid = child;
-	}
-	else if( grandparent->lokid == parent ){
-		if( parent->hikid == child ){
-			parent->hikid = child->lokid;
-			child->lokid  = parent;
-		}
-		else if ( parent->lokid == child ){
-			parent->lokid = child->hikid;
-			child->hikid  = parent;
-		}
-		grandparent->lokid = child;
-	} 
+// Return the node representing the char s, if it exists, from this list.
+trans _bsearch( trans q, char s ){
 
-}
-
-// Return the node representing the char s, if it exists, from this btree.
-Tptr _bsearch( Tptr q, char s ){
-	
-//	Tptr parent = q, grandparent = q;
+//	trans parent = q;
 	while(q){
-		if(s < q->splitchar){
-//			grandparent = parent;
-//			parent = q;
-			q = q->lokid;
-		}
-		else if (s == q->splitchar){
-//			_rotate( grandparent, parent, q );      //optimization
-			return q;
-		}
+		if(s == q->splitchar) break;
 		else {
-//			grandparent = parent;
 //			parent = q;
-			q = q->hikid;
+			q = q->next_trans;
 		}
 	}
-	return NULL;
+//	_rotate(parent);
+	return q;
 }
 
 
 
 
-int _find_literal_match(Tptr root, char *s, SV** champaddr){
+int _find_literal_match(trans root, char *s, SV** champaddr){
 
 	int matchlen = 0;
 	int depth = 0;
-	
-	Tptr p;
-	char* t;
-	
-		p = root;
-		t = s;
-//printf("in while s (%u), (%s)\n", (char) *t, t);  
-	// loop invariant: successful match in progress, longest
-	// match stored in "keys".
-		while(p){
 
-			// search for t
-			p = _bsearch( p, *t );
+	trans p = root;
+	char* t = s;
 
-			if(p){
-				t++;
+	while(p){
 
-            // Check for keyval, allowing a successful match to be recorded.
-            // If the next input char has a space, (or null termination)
-            // record a successful match.
-				if(p->keyval)
-					if( *t == ' ' || *t == 0 ){
-						*champaddr = p->keyval;
-						matchlen = depth;
-					}
-
-				depth++;
-				p = p->eqkid;
+		// if this is a termination state
+		if(!p->splitchar){
+			if( *t == ' ' || *t == 0 ){
+				*champaddr = (SV*) p->next_state;
+				matchlen = depth - 1;
 			}
+			p = p->next_trans;
 		}
+
+		// search for t
+		p = _bsearch( p, *t );
+
+		if(p){
+			t++;
+			depth++;
+			p = p->next_state;
+		}
+	}
+
 	return matchlen;
 }
 
 
-int _find_wild_match(Tobj *pTernary, Tptr root, char *s, SV** champaddr){
 
-	Tptr wildp;
+int _find_wild_match(trans root, char *s, SV** champaddr){
+
+	trans wildp;
 	pmPtr tm;
 	pmPtr temptm;
+	char wild = '*';
+//	char* wp = &wild;
+	
 	int matchlen = 0;
 	
 	tm  = (pmPtr) malloc(sizeof(pMatch));
@@ -327,19 +354,19 @@ int _find_wild_match(Tobj *pTernary, Tptr root, char *s, SV** champaddr){
 	tm->p = root;
 	tm->t = s;
 	tm->inWild = FALSE;
-		
-		// successful match in progress, longest
-		// match stored in "champaddr".
+
+	// successful match in progress, longest
+	// match stored in "champaddr".
 	while(tm && tm->p){
 		if( tm->inWild ){
 			if( *(tm->t) == ' ' || *(tm->t) == 0 ){
 				// record a match if possible
-				if( tm->p->keyval && tm->depth > matchlen ){
-					*champaddr = tm->p->keyval;
-					matchlen = tm->depth;
+				if( !tm->p->splitchar && tm->depth > matchlen ){
+					*champaddr = (SV*) tm->p->next_state;
+					matchlen = tm->depth - 1;
 				}
 				// advance p out of wildcard, loop with same char ' '
-				tm->p = tm->p->eqkid;
+				tm->p = tm->p->next_state;
 				tm->inWild = FALSE;
 			}
 			else {
@@ -350,42 +377,44 @@ int _find_wild_match(Tobj *pTernary, Tptr root, char *s, SV** champaddr){
 		}
 		else { // Not on a wildcard
 
+			if( !tm->p->splitchar ){
+				if( tm->depth > matchlen && 
+					(*(tm->t) == ' ' || *(tm->t) == 0) ){
+					*champaddr = (SV*) tm->p->next_state;
+					matchlen = tm->depth - 1;
+				}
+				tm->p = tm->p->next_trans;
+			}
+
 			// Check for a wildcards (There's got to be a better way!)
 			// Insert new match state in next pos in linked list.
-			if( wildp = _bsearch( tm->p, '*' ) ){ //Branch off 
+			if( tm->p && tm->p->splitchar == wild ){ //Branch off 
 				temptm = (pmPtr) malloc(sizeof(pMatch));
-				temptm->p = wildp;
+				temptm->p = tm->p;
 				temptm->t = tm->t;
 				temptm->depth = tm->depth;
 				temptm->next = tm->next;
 				temptm->inWild = TRUE;
 				tm->next = temptm;
+
+				tm->p = tm->p->next_trans;
 			}
 
 			// search for t, increment p
-			tm->p = _bsearch( tm->p, *(tm->t) );
-			
+			tm->p = _bsearch( tm->p, *tm->t );
+
 			if(tm->p){
-
 				tm->t++;
-
-				// record a match if possible
-				if( tm->p->keyval && tm->depth > matchlen ) 
-					if(*(tm->t) == ' ' || *(tm->t) == 0 ){
-						*champaddr = tm->p->keyval;
-						matchlen = tm->depth;
-					}
-					
 				tm->depth++;
-				tm->p = tm->p->eqkid;
+				tm->p = tm->p->next_state;
 			}
-			// fall back on previous match state, if any
-			if(!tm->p) {
-				temptm = tm->next;
-				free(tm);
-				tm = temptm; 
-			} //Go back to last branch
 		}
+		// fall back on previous match state, if any
+		if(!tm->p){
+			temptm = tm->next;
+			free(tm);
+			tm = temptm; 
+		} //Go back to last branch
 	}
 
 	while(tm){
@@ -399,10 +428,10 @@ int _find_wild_match(Tobj *pTernary, Tptr root, char *s, SV** champaddr){
 
 
 
-void _scan(Tobj *pTernary, Tptr root, char *s, bool isMindex) {
+void _scan(fsm m, trans root, char *s, bool isMindex) {
 
-	AV* keys = pTernary->found_keys;
-	AV* vals = pTernary->found_vals;
+	AV* keys = m->found_keys;
+	AV* vals = m->found_vals;
 	SV* champ = 0;
 	char* t;
 	int matchlen = 0;
@@ -411,8 +440,8 @@ void _scan(Tobj *pTernary, Tptr root, char *s, bool isMindex) {
 	
 	while(*s){
 		
-		if(pTernary->use_wildcards){
-			matchlen = _find_wild_match(pTernary, root, s, &champ);
+		if(m->use_wildcards){
+			matchlen = _find_wild_match(root, s, &champ);
 		}
 		else {
 			matchlen = _find_literal_match(root, s, &champ);
@@ -430,8 +459,12 @@ void _scan(Tobj *pTernary, Tptr root, char *s, bool isMindex) {
 				SvREFCNT_inc(champ);
 			}
 
-			s += matchlen;
-			position += matchlen;
+// The following substitution makes the scan start at every word,
+// not just after the last match.
+			s++;
+			position++;
+//			s += matchlen;
+//			position += matchlen;
 		}
 
 		while( (*s != ' ') && (*s != 0) ) { s++; position++; }
@@ -445,112 +478,104 @@ void _scan(Tobj *pTernary, Tptr root, char *s, bool isMindex) {
 
 
 
-void _keys(Tobj *pTernary, Tptr p, char* k, int depth) {
+void _keys(fsm m, trans p, char* k, int depth) {
   
 	if (!p) return;
 
-	_keys(pTernary, p->lokid, k, depth);
+	_keys(m, p->next_trans, k, depth);
 
 	if (p->splitchar){
 		*(k+depth) = p->splitchar;
-
-		if(p->keyval)
-			av_push(pTernary->found_keys, newSVpvn(k,depth+1));
-
-		_keys(pTernary, p->eqkid, k, depth+1);
+		_keys(m, p->next_state, k, depth+1);
 	}
-
-
-	_keys(pTernary, p->hikid, k, depth);
+	else
+		av_push(m->found_keys, newSVpvn(k, depth));
 }
 
 
-void _values(Tobj *pTernary, Tptr p){
+void _values(fsm m, trans p){
 
 	if (!p) return;
 
-	_values(pTernary, p->lokid);
-
-	if(p->keyval){
-		av_push(pTernary->found_keys, p->keyval);
-		SvREFCNT_inc(p->keyval);
+	_values(m, p->next_trans);
+	
+	if(p->splitchar)
+		_values(m, p->next_state);
+	else {
+		av_push(m->found_keys, (SV*)p->next_state);
+		SvREFCNT_inc((SV*)p->next_state);
 	}
-
-	if (p->splitchar)
-		_values(pTernary, p->eqkid);
-
-
-	_values(pTernary, p->hikid);
 }
 
 
 SV* new(char* class){
-	Tobj *pTernary = (Tobj *) malloc( sizeof(Tobj) );
+	fsm m = (fsm) malloc( sizeof(Fsm) );
 	SV* obj_ref = newSViv(0);
 	SV*	obj = newSVrv(obj_ref, class);
 
-	pTernary->root = 0;  
-	pTernary->terminals = 0;  
-	pTernary->nodes = 0;  
-	pTernary->btrees = 0;
-	pTernary->maxpath = 0;
-
-	pTernary->found_keys = (AV*) newAV(); 
-	pTernary->found_vals = (AV*) newAV();
-
-	pTernary->use_wildcards = FALSE;
+	m->root = 0;  
+	m->terminals = 0;  
+	m->transitions = 0;  
+	m->states = 0;  
+	m->maxpath = 0;
 	
-	sv_setiv(obj, (IV)pTernary);
+	m->found_keys = (AV*) newAV(); 
+	m->found_vals = (AV*) newAV();
+
+	m->use_wildcards = FALSE;
+	
+	sv_setiv(obj, (IV)m);
 	SvREADONLY_on(obj);
 	return obj_ref;
 }
 
 void DESTROY(SV* obj){
-	Tobj* pTernary = (Tobj*)SvIV(SvRV(obj));
+	fsm m = (fsm)SvIV(SvRV(obj));
 
-	_cleanup_(pTernary->root);
-
+	_cleanup_(m->root);
+	free(m);
 }
 
 void usewild(SV* obj){
-	Tobj* pTernary = (Tobj*)SvIV(SvRV(obj));
-	pTernary->use_wildcards = TRUE;
+	fsm m = (fsm)SvIV(SvRV(obj));
+	m->use_wildcards = TRUE;
 }
 
 int insert(SV* obj, SV* key, SV* val) {
-	Tobj *pTernary = (Tobj*)SvIV(SvRV(obj));
+	fsm m = (fsm)SvIV(SvRV(obj));
 
-	//Don't make a copy of the key, but do make one of the value.
+	//Don't make a copy of the key, but do make one of the value
 	SV* v = newSVsv( val );
 	char* s = SvPV_nolen( key );
 	int keylen = strlen(s);
-	if(keylen > pTernary->maxpath) pTernary->maxpath = keylen;
-	pTernary->root = _insert_(pTernary, pTernary->root, s, v);
+	if(keylen > m->maxpath) m->maxpath = keylen;
+	m->root = _insert_(m, m->root, s, v);
 	return 1;
 }
 
 
 int has(SV* obj, char *s) {
-	Tobj* pTernary = (Tobj*)SvIV(SvRV(obj));
-	return _search(pTernary->root, s);
+	fsm m = (fsm)SvIV(SvRV(obj));
+	return _search(m->root, s);
 }
 
 void keys(SV* obj) {
-	Tobj* pTernary = (Tobj*)SvIV(SvRV(obj));
+	fsm m = (fsm)SvIV(SvRV(obj));
 	int i;
 	SV** ptr;
 	char *k;
 	INLINE_STACK_VARS;
 
-	k = (char*) malloc(sizeof(char) * pTernary->maxpath);
+	k = (char*) malloc(sizeof(char) * m->maxpath);
 
-	_malloc(pTernary);
-	_keys(pTernary, pTernary->root, k, 0);
-	/* now look at pTernary->found_keys */
+	_malloc(m);
+	_keys(m, m->root, k, 0);
+	free(k);
+	/* now look at m->found_keys */
 
 	INLINE_STACK_RESET;
-    for (i = 0; i <= av_len(pTernary->found_keys); i++) {
-		ptr = av_fetch(pTernary->found_keys, i, 0);
+    for (i = 0; i <= av_len(m->found_keys); i++) {
+		ptr = av_fetch(m->found_keys, i, 0);
 		INLINE_STACK_PUSH(sv_2mortal(newSVsv(*ptr)));
     }
     INLINE_STACK_DONE;
@@ -558,18 +583,18 @@ void keys(SV* obj) {
 }
 
 void values(SV* obj) {
-	Tobj* pTernary = (Tobj*)SvIV(SvRV(obj));
+	fsm m = (fsm)SvIV(SvRV(obj));
 	int i;
 	SV** ptr;
 	INLINE_STACK_VARS;
 
-	_malloc(pTernary);
-	_values(pTernary, pTernary->root);
-	/* now look at pTernary->found_keys */
+	_malloc(m);
+	_values(m, m->root);
+	/* now look at m->found_keys */
 
 	INLINE_STACK_RESET;
-    for (i = 0; i <= av_len(pTernary->found_keys); i++) {
-		ptr = av_fetch(pTernary->found_keys, i, 0);
+    for (i = 0; i <= av_len(m->found_keys); i++) {
+		ptr = av_fetch(m->found_keys, i, 0);
 		INLINE_STACK_PUSH(sv_2mortal(newSVsv(*ptr)));
     }
     INLINE_STACK_DONE;
@@ -578,29 +603,30 @@ void values(SV* obj) {
 
 
 int nodes(SV* obj){
-	Tobj* pTernary = (Tobj*)SvIV(SvRV(obj));
-	return pTernary->nodes;
+	fsm m = (fsm)SvIV(SvRV(obj));
+	return m->transitions - m->terminals;
 }
 
 int terminals(SV* obj){
-	Tobj* pTernary = (Tobj*)SvIV(SvRV(obj));
-	return pTernary->terminals;
+	fsm m = (fsm)SvIV(SvRV(obj));
+	return m->terminals;
 }
 
+
 void _relay(SV* obj, char *s, bool isMindex) {
-	Tobj* pTernary = (Tobj*)SvIV(SvRV(obj));
+	fsm m = (fsm)SvIV(SvRV(obj));
 	int i;
 	SV** ptr;
 	INLINE_STACK_VARS;
 	
-	_malloc(pTernary);
-	_scan(pTernary, pTernary->root, s, isMindex);
+	_malloc(m);
+	_scan(m, m->root, s, isMindex);
 	
 	INLINE_STACK_RESET;
-	for (i = 0; i <= av_len(pTernary->found_keys); i++) {
-		ptr = av_fetch(pTernary->found_keys, i, 0);
+	for (i = 0; i <= av_len(m->found_keys); i++) {
+		ptr = av_fetch(m->found_keys, i, 0);
 		INLINE_STACK_PUSH(sv_2mortal(newSVsv(*ptr)));
-		ptr = av_fetch(pTernary->found_vals, i, 0);
+		ptr = av_fetch(m->found_vals, i, 0);
 		INLINE_STACK_PUSH(sv_2mortal(newSVsv(*ptr)));
 	}
 	INLINE_STACK_DONE;
@@ -616,29 +642,14 @@ void scan(SV* obj, char *s){
 	_relay(obj, s, FALSE);
 }
 
-
-/*
-int _btrees(Tobj *pTernary, Tptr p){
-
-    int fromhere = 0;
-
-    if (!p) return 0;
-
-    fromhere = _btrees(pTernary, p->lokid);
-
-    if (p->eqkid){
-        fromhere++;
-        fromhere += _btrees(pTernary, p->eqkid);
-    }
-
-    fromhere += _btrees(pTernary, p->hikid);
-
-    return fromhere;
-}*/
-
 int btrees(SV* obj){
-    Tobj* pTernary = (Tobj*)SvIV(SvRV(obj));
-
-	return pTernary->btrees;
+	fsm m = (fsm)SvIV(SvRV(obj));
+	return m->states;
 }
+
+
+
+
+
+
 

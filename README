@@ -50,49 +50,78 @@ SYNOPSIS
                 
 DESCRIPTION
     This module provides facilities for fast searching on arbitrarily long
-    texts with arbitrarily many search keys. The basic object behaves
-    somewhat like a perl hash, except that you can retrieve based on a
-    superstring of any keys stored. Simply scan a string as shown above and
-    you will get back a perl hash (or list) of all keys found in the string
-    (along with associated values (or positions if you use mindex() instead
-    of scan())). Longest/first order is observed during matching (meaning,
-    each subsequent match begins at the end of the last successful match,
-    and matches are "greedy", as in perl regular expressions).
+    texts with very many search keys. The basic object behaves somewhat like
+    a perl hash, except that you can retrieve based on a superstring of any
+    keys stored. Simply scan a string as shown above and you will get back a
+    perl hash (or list) of all keys found in the string (along with
+    associated values (or positions if you use mindex() instead of scan(),
+    see examples above)). All keys present in the text are returned, except
+    in the case where one or more keys are present but are prefixes of
+    another longer key. In these cases only the longest key is returned.
 
-    IMPORTANT: As of this version, a single space is used as a delimiter for
-    purposes of recognizing key boundaries. That's right, there is a bias in
-    favor of processing natural language! In other words, if 'my dog' is a
-    key and 'my dogs bite' is the text, 'my dog' will not be recognized. I
-    plan to make this more configurable in the future, to have a different
-    delimiter or none at all. For now, recognize that the key 'drunk' will
-    not be found in the text 'gedrunk' or 'drunken' (or 'drunk.' for that
-    matter). Properly tokenizing your corpus is essential. I know there is
-    probably a better solution to the problem of substrings, and if anyone
-    has suggestions, by all means contact me.
+    NOTE: This is a behavioral change from previous versions where keys
+    could never overlap. Now they may overlap and still be detected.
 
-    To be honest, what I am leaning toward is simply having no implicit
-    delimiter at all, and relying on the programmer to use a chosen
-    delimiter when inserting keys, then tokenizing the target text properly
-    so that the delimiter is present at boundaries as defined by your
-    application. This would leave you free to have no delimiter if you
-    really want "drunk" to match "gedrunk", "drunken", "drunk." etc. The
-    chore of tokenizing the target would be mitigated by pattern matching
-    capabilities (hmm..)
+    IMPORTANT: A single space is used as a delimiter for purposes of
+    recognizing key boundaries. That's right, there is a bias in favor of
+    processing natural language! In other words, if 'my dog' is a key and
+    'my dogs bite' is the text, 'my dog' will not be recognized. I plan to
+    make this more configurable in the future, to have a different delimiter
+    or none at all. For now, recognize that the key 'drunk' will not be
+    found in the text 'gedrunk' or 'drunken' (or 'drunk.' for that matter).
+    Properly tokenizing your corpus is essential. I know there is probably a
+    better solution to the problem of substrings, and if anyone has
+    suggestions, by all means contact me.
 
-    NEW in v 0.09: Wildcards! A limited wildcard functionality is available.
-    call usewild() to turn it on. Thereafter any asterisk (*) will be
-    treated as "one or more non-space characters". Once this function is
-    turned on, the scan will be approximately 50% slower than with literal
-    strings. If you include '*' in any key without calling usewild(), the
-    '*' will be treated literally.
+COMMENTARY
+    What I am leaning toward is simply having no implicit delimiter at all,
+    and relying on the programmer to use a chosen delimiter when inserting
+    keys, then tokenizing the target text properly so that the delimiter is
+    present at boundaries as defined by your application. This would leave
+    you free to have no delimiter if you really want "drunk" to match
+    "gedrunk", "drunken", "drunk." etc. The chore of tokenizing the target
+    would be mitigated by pattern matching capabilities (hmm..)
+
+NEW
+    In v 0.13: A more-or-less complete rewrite of Text::Scan uses a more
+    traditional finite-state machine rather than a ternary trie for the
+    basic data structure. This results in an average 20% savings in memory
+    and 10% savings in runtime, besides being much simpler to implement,
+    thus less prone to bugs.
+
+    In v 0.09: Wildcards! A limited wildcard functionality is available.
+    call usewild() to turn it on. Thereafter any asterisk (*) followed by a
+    space (' ') will be treated as "zero or more non-space characters". Once
+    this function is turned on, the scan will be approximately 50% slower
+    than with literal strings. If you include '*' in any key without calling
+    usewild(), the '*' will be treated literally.
 
 TO DO
     Some obvious things have not been implemented. Deletion of key/values,
     patterns as keys (kind of a big one), the abovementioned elimination of
     the default boundary marker ' ', possibility of calling scan() with a
-    filehandle instead of a string scalar.
+    filehandle instead of a string scalar. There is also an optimization
+    I've been thinking about, call it "continuation reentrancy", that would
+    greatly speed up matches on literal strings by never examining the same
+    input char more than once.
+
+    Another optimization that might help is a transition reordering scheme
+    for the sequential searches within states. This was shown by Sleator to
+    reduce the strict number of comparisons over time.
 
 CREDITS
+    Chad, Tara, Dan, Kim, love ya sweethearts.
+
+    Many test scripts come directly from Rogaski's "Tree::Ternary" module.
+
+    The C code interface was created using Ingerson's "Inline".
+
+OLD CREDITS (versions prior to 0.13)
+    The basic data structure used to be a ternary trie, but I changed it
+    starting with version 0.13 to a finite state machine, for the sake of
+    performance and simplicity. However, it was a lot of fun working with
+    these ideas, so I'm including the old credits here.
+
     The basic framework for this code is borrowed from both Bentley &
     Sedgwick, and Leon Brocard's additions to it for "Tree::Ternary_XS". The
     differences are in the modified search algorithm to allow for scanning,
@@ -120,11 +149,11 @@ SEE ALSO
     "Inline"
 
 COPYRIGHT
-    Copyright 2001 Ira Woodhead, H5 Technologies. All rights reserved.
+    Copyright 2001, 2002 Ira Woodhead. All rights reserved.
 
     This library is free software; you can redistribute it and/or modify it
     under the same terms as Perl itself
 
 AUTHOR
-    Ira Woodhead, ira@h5technologies.com
+    Ira Woodhead, ira@foobox.com
 
