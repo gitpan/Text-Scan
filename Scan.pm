@@ -5,7 +5,7 @@ use strict;
 use warnings;
 
 use vars qw($VERSION);
-$VERSION = '0.13';
+$VERSION = '0.14';
 
 # The following are for debugging only
 #use ExtUtils::Embed;
@@ -13,10 +13,18 @@ $VERSION = '0.13';
 #use Inline Config => CLEAN_AFTER_BUILD => 0; # cp _Inline/build/Text/Scan/Scan.xs .
 
 use Inline C => 'DATA',
-			VERSION => '0.13',
+			VERSION => '0.14',
 			NAME => 'Text::Scan';
 
+sub serialize {
+	my ($self, $filename) = @_;
+	return _serialize( $self, "$filename.trie", "$filename.vals" );
+}
 
+sub restore {
+	my ($self, $filename) = @_;
+	return _restore( $self, "$filename.trie", "$filename.vals");
+}
 
 1;
 
@@ -75,7 +83,15 @@ Text::Scan - Fast search for very large numbers of keys in a body of text.
 	# Turn on wildcard scanning. (New in v0.09) 
 	# This can be done anytime. Works for scan() and mindex()
 	$dict->usewild();
-		
+
+	# Save a dictionary, then restore it. (serialize and restore new in v0.14)
+	# This is cool but beware, all values will be converted to strings.
+	# Note restore() is much faster than the original insertion of 
+	# key/values. These return 0 on success, errno on failure.
+	$dict->serialize("dict_name");
+	$dict->restore("dict_name");
+
+	
 =head1 DESCRIPTION
 
 This module provides facilities for fast searching on arbitrarily long texts with very many search keys. The basic object behaves somewhat like a perl hash, except that you can retrieve based on a superstring of any keys stored. Simply scan a string as shown above and you will get back a perl hash (or list) of all keys found in the string (along with associated values (or positions if you use mindex() instead of scan(), see examples above)). All keys present in the text are returned, except in the case where one or more keys are present but are prefixes of another longer key. In these cases only the longest key is returned. 
@@ -141,7 +157,7 @@ This library is free software; you can redistribute it and/or modify it under th
 
 =head1 AUTHOR
 
-Ira Woodhead, ira@foobox.com
+Ira Woodhead, ira at foobox dot com
 
 =cut
 
@@ -217,8 +233,9 @@ trans _insert_(fsm m, trans p, char *s, SV* val) {
 	trans t = p;
 	
 	// going to be a new state with one transition.
-	if (p == 0 && *s) m->states++;
-
+	//if (p == 0 && *s) m->states++;
+	if(p == 0) m->states++;
+	
 	// search for *s in transition list (state) t
 	while(t){
 		if(*s == t->splitchar) break;
@@ -262,11 +279,11 @@ void _cleanup_(trans p) {
 
 		if(!p->splitchar){
 			sv_2mortal( (SV*) p->next_state);
-			free(p);
 		}
 		else 
 			_cleanup_(p->next_state);
 	}
+	//free(p);
 }
 
 
@@ -532,7 +549,8 @@ SV* new(char* class){
 void DESTROY(SV* obj){
 	fsm m = (fsm)SvIV(SvRV(obj));
 
-	_cleanup_(m->root);
+// takes *far* too long compared to OS garbage collection.
+//	_cleanup_(m->root);
 	free(m);
 }
 
@@ -549,6 +567,7 @@ int insert(SV* obj, SV* key, SV* val) {
 	char* s = SvPV_nolen( key );
 	int keylen = strlen(s);
 	if(keylen > m->maxpath) m->maxpath = keylen;
+	if(keylen == 0) return 1;
 	m->root = _insert_(m, m->root, s, v);
 	return 1;
 }
@@ -559,7 +578,8 @@ int has(SV* obj, char *s) {
 	return _search(m->root, s);
 }
 
-void keys(SV* obj) {
+// This handles keys() and values()
+void _traverse(SV* obj, bool isKeys){
 	fsm m = (fsm)SvIV(SvRV(obj));
 	int i;
 	SV** ptr;
@@ -569,7 +589,13 @@ void keys(SV* obj) {
 	k = (char*) malloc(sizeof(char) * m->maxpath);
 
 	_malloc(m);
-	_keys(m, m->root, k, 0);
+	if(isKeys){
+		_keys(m, m->root, k, 0);
+	}
+	else {
+		_values(m, m->root);
+	}
+	
 	free(k);
 	/* now look at m->found_keys */
 
@@ -582,35 +608,43 @@ void keys(SV* obj) {
 
 }
 
-void values(SV* obj) {
-	fsm m = (fsm)SvIV(SvRV(obj));
-	int i;
-	SV** ptr;
-	INLINE_STACK_VARS;
+void keys(SV* obj){
+	_traverse(obj, TRUE);
+}
 
-	_malloc(m);
-	_values(m, m->root);
-	/* now look at m->found_keys */
-
-	INLINE_STACK_RESET;
-    for (i = 0; i <= av_len(m->found_keys); i++) {
-		ptr = av_fetch(m->found_keys, i, 0);
-		INLINE_STACK_PUSH(sv_2mortal(newSVsv(*ptr)));
-    }
-    INLINE_STACK_DONE;
-
+void values(SV* obj){
+	_traverse(obj, FALSE);
 }
 
 
+// Deprecated, use states()
+int btrees(SV* obj){
+	fsm m = (fsm)SvIV(SvRV(obj));
+	return m->states;
+}
+
+// Deprecated and inaccurate, use transitions()
 int nodes(SV* obj){
 	fsm m = (fsm)SvIV(SvRV(obj));
 	return m->transitions - m->terminals;
+}
+
+
+int states(SV* obj){
+	fsm m = (fsm)SvIV(SvRV(obj));
+	return m->states;
+}
+
+int transitions(SV* obj){
+	fsm m = (fsm)SvIV(SvRV(obj));
+	return m->transitions;
 }
 
 int terminals(SV* obj){
 	fsm m = (fsm)SvIV(SvRV(obj));
 	return m->terminals;
 }
+
 
 
 void _relay(SV* obj, char *s, bool isMindex) {
@@ -642,12 +676,181 @@ void scan(SV* obj, char *s){
 	_relay(obj, s, FALSE);
 }
 
-int btrees(SV* obj){
+
+// Vector records
+#define BIT_ON(vec, pos) \
+		*(vec+(int)pos/8) |= (1 << (pos % 8))
+
+#define IS_BIT_ON(vec, pos) \
+		*(vec+(int)pos/8) &  (1 << (pos % 8))
+
+// This inline uses variables in context
+#define RECORD_STATE \
+	i = 1; \
+	if(front->splitchar == 0){ \
+		s = (char *)SvPV_nolen( (SV*)front->next_state ); \
+		len = strlen(s); \
+		fwrite( &len, sizeof(unsigned int), 1, valfp ); \
+		fwrite( s, sizeof(char), len, valfp ); \
+	} \
+	while(front->next_trans){ \
+		*(tlist+i) = front->splitchar; \
+		i++; \
+		front = front->next_trans; \
+		pos++; \
+	} \
+	*(tlist+i) = front->splitchar; \
+	*tlist = i; \
+	fwrite(tlist, sizeof(char), (size_t) i+1, statefp); \
+
+	
+	// Record the trie and its values to disk, to be reloaded
+// at another time. For this to work, all values must be either 
+// numbers or strings, ie Perl scalars but no references.
+// tlist - String to record the transition list for each state
+// tvector - bit vector of transition positions, to record the 
+// 		end-of-state position so the trie can be recreated.
+int _serialize(SV* obj, char *triename, char *valsname){
 	fsm m = (fsm)SvIV(SvRV(obj));
-	return m->states;
+	trans front, back, last;
+	FILE *statefp, *valfp;
+	unsigned int pos, len, i;
+	char *tlist = (char*) malloc(sizeof(char) * 255);
+	char *tvector = (char*) calloc(lround(m->transitions/8), sizeof(char));
+	char *s;
+	
+	if( !(statefp = fopen(triename, "wb"))){ return errno; }
+	if( !(valfp =   fopen(valsname, "wb"))){ return errno; }
+
+	fwrite( &m->terminals,   sizeof(int), 1, statefp );
+	fwrite( &m->transitions, sizeof(int), 1, statefp );
+	fwrite( &m->states,      sizeof(int), 1, statefp );
+	fwrite( &m->maxpath,     sizeof(int), 1, statefp );
+	fwrite( &m->use_wildcards, sizeof(bool), 1, statefp );
+	
+	// execute breadth-first traversal of the trie
+	// recording the positions of state-ending transitions
+	// in the bit vector for later reconstruction.
+	front = back = m->root;
+	pos = 0;
+	while( front ){
+		// record state [and value if present] at front, 
+		// move front to end of state. Increment pos by len of state
+		RECORD_STATE;
+		BIT_ON(tvector, pos);
+		
+		if(!back){ break; } //the end
+		
+		front->next_trans = back->next_state;
+		front = front->next_trans; 
+		pos++;
+		back = back->next_trans;
+		while(back && back->splitchar == 0){ 
+			back = back->next_trans;
+		}
+	}
+
+// Now repair the trie, severing horizontal links between states
+	front = m->root;
+	for( pos=0; pos < m->transitions; pos++ ){
+		if(IS_BIT_ON(tvector, pos)){
+			back = front;
+			front = front->next_trans;
+			back->next_trans = 0;
+		}
+		else {
+			front = front->next_trans;
+		}
+	}
+	
+	fclose(statefp);
+	fclose(valfp);
+
+	return 0;
 }
 
 
+// Add a value back into the trie. Called from restore()
+void _restore_val(trans t, FILE* valfp){	
+	unsigned int len = 0;
+	char* s;
+	
+	fread(&len, sizeof(unsigned int), 1, valfp);
+	s = (char*) malloc(len * sizeof(char));
+	fread(s, sizeof(char), len, valfp);
+
+	t->next_state = (trans)	newSVpvn(s, len);	 
+}
+
+// Restore the serialized trie.
+int _restore( SV* obj, char *triename, char *valsname ){
+	fsm m = (fsm)SvIV(SvRV(obj));
+	trans front, back, last, linker, restorer;
+	FILE *statefp, *valfp;
+	int i, j, transitions = 0, states = 0, terminals = 0;
+	char len, splitchar;
+
+	if( !(statefp = fopen(triename, "rb")) ){ return errno; }
+	if( !(valfp =   fopen(valsname, "rb")) ){ return errno; }
+
+	
+/* Read in metadata */
+	fread( &m->terminals,   sizeof(int), 1, statefp );
+	fread( &m->transitions, sizeof(int), 1, statefp );
+	fread( &m->states,      sizeof(int), 1, statefp );
+	fread( &m->maxpath,     sizeof(int), 1, statefp );
+	fread( &m->use_wildcards, sizeof(bool), 1, statefp );
+	
+	// create transitions
+	m->root = (trans) malloc(sizeof(Trans));
+	front = m->root;
+	while( !feof(statefp) ){
+		states++;
+		fread( &len, sizeof(char), 1, statefp );
+		for( j=0; j < len; j++ ){
+			splitchar = (char) getc(statefp);
+			front->splitchar = splitchar;
+			front->next_state = 0;
+			front->next_trans = (trans) malloc(sizeof(Trans));
+			transitions++;
+			last = front;
+			front = front->next_trans;
+		}
+		front->next_trans = 0; 
+		front->next_state = 0;
+		last->next_state = front;
+		last->next_trans = 0;
+	}
+	last->next_state = 0;
+	free(front);
+	
+	// link transitions appropriately
+	front = back = m->root;
+	while(back){
+		linker = back;
+		while(front->next_trans)
+			front = front->next_trans;
+		front = front->next_state;
+
+		back = back->next_trans ? back->next_trans : back->next_state;
+		while(back && !back->splitchar){
+			restorer = back;
+			back = back->next_trans ? back->next_trans : back->next_state;
+			_restore_val(restorer, valfp);
+			terminals++;
+		}
+		linker->next_state = front;
+	}
+
+	m->transitions = transitions - 1;
+	m->states = states - 1;
+	m->terminals = terminals;
+	
+	fclose(valfp);
+	fclose(statefp);
+
+	return 0;
+}
 
 
 

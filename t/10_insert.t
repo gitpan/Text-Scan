@@ -7,69 +7,69 @@ BEGIN { plan tests => 51 }
 
 $ref = new Text::Scan;
 
-ok($ref->nodes(), 0);
+ok($ref->transitions(), 0);
 ok($ref->terminals(), 0);
-ok($ref->btrees(), 0);
+ok($ref->states(), 0);
 
 ok($ref->insert("firewater", "~"));
-ok($ref->nodes(), 9);
+ok($ref->transitions(), 10);
 ok($ref->terminals(), 1);
-ok($ref->btrees(), 9);
+ok($ref->states(), 10);
 
 ok($ref->insert("firewater", "~"));
-ok($ref->nodes(), 9);
+ok($ref->transitions(), 10);
 ok($ref->terminals(), 1);
-ok($ref->btrees(), 9);
+ok($ref->states(), 10);
 
 ok($ref->insert("stereolab", "~"));
-ok($ref->nodes(), 18);
+ok($ref->transitions(), 20);
 ok($ref->terminals(), 2);
-ok($ref->btrees(), 17);
+ok($ref->states(), 19);
 
 ok($ref->insert("tirewater", "~"));
-ok($ref->nodes(), 27);
+ok($ref->transitions(), 30);
 ok($ref->terminals(), 3);
-ok($ref->btrees(), 25);
+ok($ref->states(), 28);
 
 ok($ref->insert("tidewater", "~"));
-ok($ref->nodes(), 34);
+ok($ref->transitions(), 38);
 ok($ref->terminals(), 4);
-ok($ref->btrees(), 31);
+ok($ref->states(), 35);
 
 ok($ref->insert("tidewader", "~"));
-ok($ref->nodes(), 37);
+ok($ref->transitions(), 42);
 ok($ref->terminals(), 5);
-ok($ref->btrees(), 33);
+ok($ref->states(), 38);
 
 ok($ref->insert("firewater", "~"));
-ok($ref->nodes(), 37);
+ok($ref->transitions(), 42);
 ok($ref->terminals(), 5);
-ok($ref->btrees(), 33);
+ok($ref->states(), 38);
 
-ok($ref->insert("","~")); # This is a special case, makes a new node.
-ok($ref->nodes(), 37);
-ok($ref->terminals(), 6);
-ok($ref->btrees(), 33);
+ok($ref->insert("","~")); # This is a special case, makes nothing.
+ok($ref->transitions(), 42);
+ok($ref->terminals(), 5);
+ok($ref->states(), 38);
 
 ok($ref->insert("stereo","~"));
-ok($ref->nodes(), 37);
-ok($ref->terminals(), 7);
-ok($ref->btrees(), 33);
+ok($ref->transitions(), 43);
+ok($ref->terminals(), 6);
+ok($ref->states(), 38);
 
 ok($ref->insert("","~"));
-ok($ref->nodes(), 37);
-ok($ref->terminals(), 7);
-ok($ref->btrees(), 33);
+ok($ref->transitions(), 43);
+ok($ref->terminals(), 6);
+ok($ref->states(), 38);
 
 for ($i = 1;$i < 256;$i++) { $big .= chr($i); }
-ok($ref->insert($big,"~"));
-ok($ref->nodes(), 292);
-ok($ref->terminals(), 8);
-ok($ref->btrees(), 287);
+ok($ref->insert($big, "~"));
+ok($ref->transitions(), 299);
+ok($ref->terminals(), 7);
+ok($ref->states(), 293);
 
 ok($ref->insert($big,"~"));
-ok($ref->nodes(), 292);
-ok($ref->terminals(), 8);
-ok($ref->btrees(), 287);
+ok($ref->transitions(), 299);
+ok($ref->terminals(), 7);
+ok($ref->states(), 293);
 
 

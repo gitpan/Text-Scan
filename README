@@ -47,7 +47,14 @@ SYNOPSIS
             # Turn on wildcard scanning. (New in v0.09) 
             # This can be done anytime. Works for scan() and mindex()
             $dict->usewild();
-                
+
+            # Save a dictionary, then restore it. (serialize and restore new in v0.14)
+            # This is cool but beware, all values will be converted to strings.
+            # Note restore() is much faster than the original insertion of 
+            # key/values. These return 0 on success, errno on failure.
+            $dict->serialize("dict_name");
+            $dict->restore("dict_name");
+
 DESCRIPTION
     This module provides facilities for fast searching on arbitrarily long
     texts with very many search keys. The basic object behaves somewhat like
@@ -155,5 +162,5 @@ COPYRIGHT
     under the same terms as Perl itself
 
 AUTHOR
-    Ira Woodhead, ira@foobox.com
+    Ira Woodhead, ira at foobox dot com
 

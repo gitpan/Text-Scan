@@ -20,3 +20,5 @@ t/65_wildcards.t
 t/66_wildcards.t
 t/67_wildcards.t
 t/70_substrings.t
+t/75_dumptrie.t
+t/76_restoretrie.t

@@ -32,4 +32,7 @@ Revision history for Perl extension Text::Scan.
 0.13  Fri May 31 18:51:47 PDT 2002
 	- Rewrote basic data structure to be a Finite State Machine rather than Ternary Trie. Speed savings 10%, memory savings 20%, simpler to grasp/debug.
 
+0.14 Thu Aug 29 16:04:07 PDT 2002
+	- Added new serialize()/restore() functions for saving dicts
+	- Added more accurate diagnostic functions states(), transitions(), terminals()
 
