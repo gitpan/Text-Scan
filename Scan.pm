@@ -5,7 +5,7 @@ use strict;
 use warnings;
 
 use vars qw($VERSION);
-$VERSION = '0.14';
+$VERSION = '0.15';
 
 # The following are for debugging only
 #use ExtUtils::Embed;
@@ -13,7 +13,7 @@ $VERSION = '0.14';
 #use Inline Config => CLEAN_AFTER_BUILD => 0; # cp _Inline/build/Text/Scan/Scan.xs .
 
 use Inline C => 'DATA',
-			VERSION => '0.14',
+			VERSION => '0.15',
 			NAME => 'Text::Scan';
 
 sub serialize {
@@ -716,7 +716,7 @@ int _serialize(SV* obj, char *triename, char *valsname){
 	FILE *statefp, *valfp;
 	unsigned int pos, len, i;
 	char *tlist = (char*) malloc(sizeof(char) * 255);
-	char *tvector = (char*) calloc(lround(m->transitions/8), sizeof(char));
+	char *tvector = (char*) calloc(ceil(m->transitions/8), sizeof(char));
 	char *s;
 	
 	if( !(statefp = fopen(triename, "wb"))){ return errno; }
@@ -788,7 +788,8 @@ int _restore( SV* obj, char *triename, char *valsname ){
 	trans front, back, last, linker, restorer;
 	FILE *statefp, *valfp;
 	int i, j, transitions = 0, states = 0, terminals = 0;
-	char len, splitchar;
+	char len;
+	char *metastr;
 
 	if( !(statefp = fopen(triename, "rb")) ){ return errno; }
 	if( !(valfp =   fopen(valsname, "rb")) ){ return errno; }
@@ -800,7 +801,7 @@ int _restore( SV* obj, char *triename, char *valsname ){
 	fread( &m->states,      sizeof(int), 1, statefp );
 	fread( &m->maxpath,     sizeof(int), 1, statefp );
 	fread( &m->use_wildcards, sizeof(bool), 1, statefp );
-	
+
 	// create transitions
 	m->root = (trans) malloc(sizeof(Trans));
 	front = m->root;
@@ -808,8 +809,7 @@ int _restore( SV* obj, char *triename, char *valsname ){
 		states++;
 		fread( &len, sizeof(char), 1, statefp );
 		for( j=0; j < len; j++ ){
-			splitchar = (char) getc(statefp);
-			front->splitchar = splitchar;
+			front->splitchar = (char) getc(statefp);
 			front->next_state = 0;
 			front->next_trans = (trans) malloc(sizeof(Trans));
 			transitions++;
