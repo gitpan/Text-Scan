@@ -4,5 +4,5 @@ use Inline::MakeMaker;
 WriteInlineMakefile(
     'NAME'		=> 'Text::Scan',
     'VERSION_FROM'	=> 'Scan.pm', # finds $VERSION
-    'PREREQ_PM'		=> {Inline => 0.42}, # e.g., Module::Name => 1.1
+    'PREREQ_PM'		=> {Inline => 0.43}, # e.g., Module::Name => 1.1
 );

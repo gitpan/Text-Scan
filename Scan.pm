@@ -8,8 +8,9 @@ use vars qw($VERSION);
 $VERSION = '0.04';
 
 # The following are for debugging only
-#use ExtUtils::Embed;
-#use Inline C => Config => CCFLAGS => "-g"; # add debug stubs to C lib
+use ExtUtils::Embed;
+use Inline C => Config => CCFLAGS => "-g"; # add debug stubs to C lib
+use Inline Config => CLEAN_AFTER_BUILD => 0; # cp _Inline/Text/Scan/Scan.xs .
 
 use Inline C => 'DATA',
 			VERSION => '0.04',
@@ -175,6 +176,7 @@ void _cleanup_(Tptr p) {
 			_cleanup_(p->eqkid);
 		} else {
 			free(p->eqkid); /* It's just a string, free the memory */
+			/* sv_2mortal(p->val);  Is this necessary?? */
 		}
 		_cleanup_(p->hikid);
 		free(p);  
@@ -355,7 +357,6 @@ void DESTROY(SV* obj){
 
 	if (pTernary->searchcharn > 0){
 		free(pTernary->searchchar);
-		sv_2mortal(pTernary->val);
 	}
 }
 
