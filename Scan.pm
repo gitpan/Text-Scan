@@ -5,15 +5,15 @@ use strict;
 use warnings;
 
 use vars qw($VERSION);
-$VERSION = '0.05';
+$VERSION = '0.06';
 
 # The following are for debugging only
-use ExtUtils::Embed;
-use Inline C => Config => CCFLAGS => "-g"; # add debug stubs to C lib
-use Inline Config => CLEAN_AFTER_BUILD => 0; # cp _Inline/Text/Scan/Scan.xs .
+#use ExtUtils::Embed;
+#use Inline C => Config => CCFLAGS => "-g"; # add debug stubs to C lib
+#use Inline Config => CLEAN_AFTER_BUILD => 0; # cp _Inline/Text/Scan/Scan.xs .
 
 use Inline C => 'DATA',
-			VERSION => '0.05',
+			VERSION => '0.06',
 			NAME => 'Text::Scan';
 
 
@@ -240,7 +240,6 @@ Tptr _bsearch( Tptr q, char s ){
 }
 
 
-//BROKEN!
 void _scan(Tobj *pTernary, Tptr root, char *s) {
 
 	Tptr p;
@@ -278,6 +277,8 @@ void _scan(Tobj *pTernary, Tptr root, char *s) {
 				if(*t == 0){
 					av_push(keys, p->keyval[0]);
 					av_push(vals, p->keyval[1]);
+					SvREFCNT_inc(p->keyval[0]);
+					SvREFCNT_inc(p->keyval[1]);
 					return;
 				}
 				p = p->eqkid;
@@ -291,6 +292,8 @@ void _scan(Tobj *pTernary, Tptr root, char *s) {
 			s += matchlen;
 			av_push(keys, champ[0]);
 			av_push(vals, champ[1]);
+			SvREFCNT_inc(champ[0]);
+			SvREFCNT_inc(champ[1]);
 		}
 		while( (*s != ' ') && (*s != 0) ) s++;
 

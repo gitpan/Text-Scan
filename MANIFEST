@@ -12,3 +12,4 @@ t/50_traverse.t
 t/55_scan.t
 t/56_scan.t
 t/57_breakme.t
+t/58_twice.t
