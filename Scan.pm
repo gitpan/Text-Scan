@@ -5,7 +5,7 @@ use strict;
 use warnings;
 
 use vars qw($VERSION);
-$VERSION = '0.06';
+$VERSION = '0.07';
 
 # The following are for debugging only
 #use ExtUtils::Embed;
@@ -13,7 +13,7 @@ $VERSION = '0.06';
 #use Inline Config => CLEAN_AFTER_BUILD => 0; # cp _Inline/Text/Scan/Scan.xs .
 
 use Inline C => 'DATA',
-			VERSION => '0.06',
+			VERSION => '0.07',
 			NAME => 'Text::Scan';
 
 
@@ -58,17 +58,29 @@ Text::Scan - Fast search for very large numbers of keys in a body of text.
 	# Retrieve all keys
 	@keys = $dict->keys();
 
+	# Like perl's index() but with multiple patterns (new in v0.07)
+	# Scan for the starting positions of terms.
+	@indices = $dict->mindex( $document );
+
+	# The hash version of mindex() records the position of the first 
+	# occurrences of each word
+	%indices = $dict->mindex( $document ); 
 
 =head1 DESCRIPTION
 
-This module provides facilities for fast searching on arbitrarily long texts with arbitrarily many search keys. The basic object behaves somewhat like a perl hash, except that you can retrieve based on a superstring of any keys stored. Simply scan a string as shown above and you will get back a perl hash (or list) of all keys found in the string (along with associated values). Longest/first order is observed (as in perl regular expressions).
+This module provides facilities for fast searching on arbitrarily long texts with arbitrarily many search keys. The basic object behaves somewhat like a perl hash, except that you can retrieve based on a superstring of any keys stored. Simply scan a string as shown above and you will get back a perl hash (or list) of all keys found in the string (along with associated values (or positions if you use mindex() instead of scan())). Longest/first order is observed during matching (meaning, each subsequent match begins at the end of the last successful match, and matches are "greedy", as in perl regular expressions).
 
 IMPORTANT: As of this version, a B<single space> is used as a delimiter for purposes of recognizing key boundaries. That's right, there is a bias in favor of processing natural language! In other words, if 'my dog' is a key and 'my dogs bite' is the text, 'my dog' will B<not> be recognized. I plan to make this more configurable in the future, to have a different delimiter or none at all. For now, recognize that the key 'drunk' will not be found in the text 'gedrunk' or 'drunken' (or 'drunk.' for that matter). Properly tokenizing your corpus is essential. I know there is probably a better solution to the problem of substrings, and if anyone has suggestions, by all means contact me.
 
+To be honest, what I am leaning toward is simply having no implicit delimiter at all, and relying on the programmer to use a chosen delimiter when inserting keys, then tokenizing the target text properly so that the delimiter is present at boundaries as defined by your application. This would leave you free to have no delimiter if you really want "drunk" to match "gedrunk", "drunken", "drunk." etc. The chore of tokenizing the target would be mitigated by pattern matching capabilities (hmm..)
+
+=head1 TO DO
+
+Some obvious things have not been implemented. Deletion of key/values, patterns as keys (kind of a big one), the abovementioned elimination of the default boundary marker ' ', possibility of calling scan() with a filehandle instead of a string scalar.
 
 =head1 CREDITS
 
-Except for the actual scanning part, plus the node-rotation for self-adjusting optimization, this code is heavily borrowed from both Bentley & Sedgwick and Leon Brocard's additions to it for C<Tree::Ternary_XS>. 
+This code is heavily borrowed from both Bentley & Sedgwick, and Leon Brocard's additions to it for C<Tree::Ternary_XS>. The differences are in the modified search algorothm to allow for scanning, the storage of keys/values, and an extra node-rotation for gradual self-adjusting optimization to the statistical characteristics of the target text.
 
 Many test scripts come directly from Rogaski's C<Tree::Ternary> module.
 
@@ -96,7 +108,7 @@ This library is free software; you can redistribute it and/or modify it under th
 
 =head1 AUTHOR
 
-Ira Woodhead, bunghole@pobox.com
+Ira Woodhead, ira@h5technologies.com
 
 =cut
 
@@ -303,7 +315,79 @@ void _scan(Tobj *pTernary, Tptr root, char *s) {
 	}
 
 }
-  
+
+
+
+
+void _mindex(Tobj *pTernary, Tptr root, char *s) {
+
+	Tptr p;
+	Tptr terminal;
+	AV* keys = pTernary->found_keys;
+	AV* vals = pTernary->found_vals;
+	SV** champ = 0;
+	char* t;
+	int depth = 0;
+	int matchlen = 0;
+	int position = 0;
+	
+	while(*s){
+		p = root;
+		t = s;
+//printf("in while s (%u), (%s)\n", (char) *t, t);	
+		// loop invariant: successful match in progress, longest
+		// match stored in "keys".
+		while(p){
+
+			// Check for space, allowing a successful match to be recorded.
+			// If the input string has a space and the tree indicates a
+			// termination of a pattern, record a successful match.
+			if( *t == ' ' )
+				if(terminal = _bsearch( p, 0 )){
+					champ = terminal->keyval;
+					matchlen = depth;
+				}
+			// Continue to match if possible.
+			// search for t, increment p 
+			p = _bsearch( p, *t );
+
+			if(p){
+					// Record a match and return if input string is ended 
+					// and tree indicates termination (t == 0)
+				if(*t == 0){
+					av_push(keys, p->keyval[0]);
+					av_push(vals, newSViv(position));
+					SvREFCNT_inc(p->keyval[0]);
+					//SvREFCNT_inc(p->keyval[1]);
+					return;
+				}
+				p = p->eqkid;
+				t++;
+				depth++;
+			}
+		}
+	
+		// truncate s by length of match or first word...
+		if(matchlen){
+			s += matchlen;
+			av_push(keys, champ[0]);
+			av_push(vals, newSViv(position));
+			SvREFCNT_inc(champ[0]);
+			//SvREFCNT_inc(champ[1]);
+			position += matchlen;
+		}
+
+		while( (*s != ' ') && (*s != 0) ) { s++; position++; }
+
+		if(*s != 0) { s++; position++; } // chop off the space
+		matchlen = 0;
+		depth = 0;
+	}
+
+}
+
+
+
 
 void _keys(Tobj *pTernary, Tptr p) {
   
@@ -401,6 +485,27 @@ void scan(SV* obj, char *s) {
 	
 	_malloc(pTernary);
 	_scan(pTernary, pTernary->root, s);
+
+	INLINE_STACK_RESET;
+	for (i = 0; i <= av_len(pTernary->found_keys); i++) {
+		ptr = av_fetch(pTernary->found_keys, i, 0);
+		INLINE_STACK_PUSH(sv_2mortal(newSVsv(*ptr)));
+		ptr = av_fetch(pTernary->found_vals, i, 0);
+		INLINE_STACK_PUSH(sv_2mortal(newSVsv(*ptr)));
+	}
+	INLINE_STACK_DONE;
+
+}
+
+
+void mindex(SV* obj, char *s) {
+	Tobj* pTernary = (Tobj*)SvIV(SvRV(obj));
+	int i;
+	SV** ptr;
+	INLINE_STACK_VARS;
+	
+	_malloc(pTernary);
+	_mindex(pTernary, pTernary->root, s);
 
 	INLINE_STACK_RESET;
 	for (i = 0; i <= av_len(pTernary->found_keys); i++) {

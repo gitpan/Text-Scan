@@ -31,14 +31,24 @@ SYNOPSIS
             # Retrieve all keys
             @keys = $dict->keys();
 
+            # Like perl's index() but with multiple patterns (new in v0.07)
+            # Scan for the starting positions of terms.
+            @indices = $dict->mindex( $document );
+
+            # The hash version of mindex() records the position of the first 
+            # occurrences of each word
+            %indices = $dict->mindex( $document ); 
+
 DESCRIPTION
     This module provides facilities for fast searching on arbitrarily long
     texts with arbitrarily many search keys. The basic object behaves
     somewhat like a perl hash, except that you can retrieve based on a
     superstring of any keys stored. Simply scan a string as shown above and
     you will get back a perl hash (or list) of all keys found in the string
-    (along with associated values). Longest/first order is observed (as in
-    perl regular expressions).
+    (along with associated values (or positions if you use mindex() instead
+    of scan())). Longest/first order is observed during matching (meaning,
+    each subsequent match begins at the end of the last successful match,
+    and matches are "greedy", as in perl regular expressions).
 
     IMPORTANT: As of this version, a single space is used as a delimiter for
     purposes of recognizing key boundaries. That's right, there is a bias in
@@ -51,11 +61,27 @@ DESCRIPTION
     probably a better solution to the problem of substrings, and if anyone
     has suggestions, by all means contact me.
 
+    To be honest, what I am leaning toward is simply having no implicit
+    delimiter at all, and relying on the programmer to use a chosen
+    delimiter when inserting keys, then tokenizing the target text properly
+    so that the delimiter is present at boundaries as defined by your
+    application. This would leave you free to have no delimiter if you
+    really want "drunk" to match "gedrunk", "drunken", "drunk." etc. The
+    chore of tokenizing the target would be mitigated by pattern matching
+    capabilities (hmm..)
+
+TO DO
+    Some obvious things have not been implemented. Deletion of key/values,
+    patterns as keys (kind of a big one), the abovementioned elimination of
+    the default boundary marker ' ', possibility of calling scan() with a
+    filehandle instead of a string scalar.
+
 CREDITS
-    Except for the actual scanning part, plus the node-rotation for
-    self-adjusting optimization, this code is heavily borrowed from both
-    Bentley & Sedgwick and Leon Brocard's additions to it for
-    `Tree::Ternary_XS'.
+    This code is heavily borrowed from both Bentley & Sedgwick, and Leon
+    Brocard's additions to it for `Tree::Ternary_XS'. The differences are in
+    the modified search algorothm to allow for scanning, the storage of
+    keys/values, and an extra node-rotation for gradual self-adjusting
+    optimization to the statistical characteristics of the target text.
 
     Many test scripts come directly from Rogaski's `Tree::Ternary' module.
 
@@ -83,5 +109,5 @@ COPYRIGHT
     under the same terms as Perl itself
 
 AUTHOR
-    Ira Woodhead, bunghole@pobox.com
+    Ira Woodhead, ira@h5technologies.com
 
