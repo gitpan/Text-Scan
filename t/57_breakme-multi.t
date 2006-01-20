@@ -1,10 +1,8 @@
 #!/usr/bin/perl
 ###########################################################################
 
-use Test;
+use Test::More tests => 347;
 use Text::Scan;
-
-BEGIN { plan tests => 347 }
 
 $ref = new Text::Scan;
 
@@ -157,7 +155,7 @@ $line =
 print "results contain ", scalar @result, " items\n";
 #print join("\n", @result), "\n";
 
-ok( 173, scalar @result );
+ok( 173 == scalar @result, 'correct number of results' );
 
 # Just getting through without a segfault is good enough here!
 
@@ -511,8 +509,10 @@ my @answers = (
 	);
 
 for my $i (0..$#result){
-	ok($result[$i]->[0] eq $answers[$i*2]);
-	ok($result[$i]->[2] eq $answers[$i*2+1]);
+	ok($result[$i]->[0] eq $answers[$i*2], 
+        $result[$i]->[0] . " is $answers[$i*2]");
+	ok($result[$i]->[2] eq $answers[$i*2+1],
+        $result[$i]->[2] . " is $answers[$i*2+1]"); 
 }
 
 

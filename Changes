@@ -59,3 +59,11 @@ Revision history for Perl extension Text::Scan.
 0.23 Tue Apr  6 13:29:22 PDT 2004
 	- Scanning code major rewrite. New functions: multiscan(), dump().
 
+0.24 Fri Jun 18 13:50:21 PDT 2004
+	- changed 'getc' to 'fgetc' for Windows compatibility.
+
+0.25 Wed Jan  5 18:18:28 PST 2005
+	- added squeezeblanks() option to treat contiguous space-equivalents as one.
+
+0.25 Thu Jan 19 17:42:29 PST 2006
+	- changed file operations in _serialize and _restore to PerlIO counterparts for ActiveState 5.8.x compatibility

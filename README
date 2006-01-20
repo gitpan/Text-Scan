@@ -3,98 +3,103 @@ NAME
     text.
 
 SYNOPSIS
-            use Text::Scan;
+        use Text::Scan;
 
-            $dict = new Text::Scan;
+        $dict = new Text::Scan;
 
-            %terms = ( dog  => 'canine',
-                       bear => 'ursine',
-                       pig  => 'porcine' );
+        %terms = ( dog  => 'canine',
+                   bear => 'ursine',
+                   pig  => 'porcine' );
 
-            # load the dictionary with keys and values
-            # (values can be any scalar, keys must be strings)
-            while( ($key, $val) = each %terms ){
-                    $dict->insert( $key, $val );
-            }
+        # load the dictionary with keys and values
+        # (values can be any scalar, keys must be strings)
+        while( ($key, $val) = each %terms ){
+            $dict->insert( $key, $val );
+        }
 
-            # Scan a document for matches
-            $document = 'the dog ate the bear but the dog got indigestion';
-            %found = $dict->scan( $document );
-            # now %found is ( dog => canine, bear => ursine )
+        # Scan a document for matches
+        $document = 'the dog ate the bear but the dog got indigestion';
+        %found = $dict->scan( $document );
+        # now %found is ( dog => canine, bear => ursine )
 
-            # Or, if you need to count number of occurrences of any given 
-            # key, use an array. This will give you a countable flat list
-            # of key => value pairs.
-            @found = $dict->scan( $document );
-            # now @found is ( dog => canine, bear => ursine, dog => canine )
+        # Or, if you need to count number of occurrences of any given 
+        # key, use an array. This will give you a countable flat list
+        # of key => value pairs.
+        @found = $dict->scan( $document );
+        # now @found is ( dog => canine, bear => ursine, dog => canine )
 
-            # Check for membership ($val is true)
-            $val = $dict->has('pig');
+        # Check for membership ($val is true)
+        $val = $dict->has('pig');
 
-            # Retrieve all keys. This returns all inserted keys in order 
-            # of insertion 
-            @keys = $dict->keys();
-            # @keys is ( dog, bear, pig )
+        # Retrieve all keys. This returns all inserted keys in order 
+        # of insertion 
+        @keys = $dict->keys();
+        # @keys is ( dog, bear, pig )
 
-            # Retrieve all values (in same order as corresponding keys) 
-            # (new in v0.10)
-            @vals = $dict->values();
-            # @vals is ( canine, ursine, porcine )
+        # Retrieve all values (in same order as corresponding keys) 
+        # (new in v0.10)
+        @vals = $dict->values();
+        # @vals is ( canine, ursine, porcine )
 
-            # Get back everything you inserted
-            %everything = $dict->dump();
+        # Get back everything you inserted
+        %everything = $dict->dump();
 
-            # "mindex"
-            # Like perl's index() but with multiple patterns (new in v0.07)
-            # you can scan for the starting positions of terms.
-            @indices = $dict->mindex( $document );
-            # @indices is ( dog => 4, bear => 16, dog => 29 ) 
+        # "mindex"
+        # Like perl's index() but with multiple patterns (new in v0.07)
+        # you can scan for the starting positions of terms.
+        @indices = $dict->mindex( $document );
+        # @indices is ( dog => 4, bear => 16, dog => 29 ) 
 
-            # The hash context yields the position of the last occurrences 
-            # of each word 
-            %indices = $dict->mindex( $document ); 
-            # %indices is ( dog => 26, bear => 16 )
+        # The hash context yields the position of the last occurrences 
+        # of each word 
+        %indices = $dict->mindex( $document ); 
+        # %indices is ( dog => 26, bear => 16 )
 
-            # multiscan() (>= v0.23)
-            # Retrieves everything scan() and mindex() does, in the form
-            # of an array of references. Each reference points to a list
-            # of (key, index, value)
-            @result = $dict->multiscan($document);
-            # @result is ([dog, 4, canine], [bear, 16, ursine], [dog, 29, canine])
+        # multiscan() (>= v0.23)
+        # Retrieves everything scan() and mindex() does, in the form
+        # of an array of references. Each reference points to a list
+        # of (key, index, value)
+        @result = $dict->multiscan($document);
+        # @result is ([dog, 4, canine], [bear, 16, ursine], [dog, 29, canine])
 
-            # Turn on wildcard scanning. (>= v0.09) 
-            # This can be done anytime. Works for scan() and mindex(). Wildcards
-            # encompass any number of non-single-space-equivalent chars.
-            $dict->usewild();
+        # Turn on wildcard scanning. (>= v0.09) 
+        # This can be done anytime. Works for scan() and mindex(). Wildcards
+        # encompass any number of non-single-space-equivalent chars.
+        $dict->usewild();
 
-            # Save a dictionary, then restore it. (serialize and restore new in v0.14)
-            # This is cool but beware, all values will be converted to strings.
-            # Note restore() is much faster than the original insertion of 
-            # key/values. These return 0 on success, errno on failure.
-            $dict->serialize("dict_name");
-            $dict->restore("dict_name");
+        # Save a dictionary, then restore it. (serialize and restore new in v0.14)
+        # This is cool but beware, all values will be converted to strings.
+        # Note restore() is much faster than the original insertion of 
+        # key/values. These return 0 on success, errno on failure.
+        $dict->serialize("dict_name");
+        $dict->restore("dict_name");
 
-            # Place a global char equivalency class into effect. This matches all
-            # these characters as if they were the same. (v0.17)
-            $dict->charclass(".:;,?");
-            $dict->insert("What?", "What?");
-            @found = $dict->scan("Err... What, something wrong?");
-            # now @found is ( "What," => "What?" );
+        # Place a global char equivalency class into effect. This matches all
+        # these characters as if they were the same. (v0.17)
+        $dict->charclass(".:;,?");
+        $dict->insert("What?", "What?");
+        @found = $dict->scan("Err... What, something wrong?");
+        # now @found is ( "What," => "What?" );
 
-            # Scan case-insensitively. This must be called before any insertions.
-            $dict->ignorecase();
+        # Scan case-insensitively. This must be called before any insertions.
+        $dict->ignorecase();
 
-            # Set a class of chars to be the boundaries of any match, 
-            # such that the chars immediately before the beginning and after the
-            # ending of a match have to be in this class. Default is the single
-            # space. (beginning and ending of string always count as bounds)
-            # This can be called at any time, and supercedes any previous calls.
-            $dict->boundary(".? ");
+        # Set a class of chars to be the boundaries of any match, 
+        # such that the chars immediately before the beginning and after the
+        # ending of a match have to be in this class. Default is the single
+        # space. (beginning and ending of string always count as bounds)
+        # This can be called at any time, and supercedes any previous calls.
+        $dict->boundary(".? ");
 
-            # Ignore certain chars. You can define a class of chars that the
-            # dictionary should pretend do not exist. You must call this before
-            # any insertions.
-            $dict->ignore("\n\r<>()");
+        # Ignore certain chars. You can define a class of chars that the
+        # dictionary should pretend do not exist. You must call this before
+        # any insertions.
+        $dict->ignore("\n\r<>()");
+
+        # Treat all contiguous single-space-equivalent chars 
+        # (as defined by charclass()) as one char. Most requested feature 
+        # lately, new in v0.25
+        $dict->squeezeblanks;
 
 DESCRIPTION
     This module provides facilities for fast searching on strings with very

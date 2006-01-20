@@ -26,6 +26,7 @@ ok( $#result, $#answer );
 ok($result[0], $answer[0] );
 ok($result[1], $answer[1] );
 
+
 @result = $ref->scan( $text2 );
 @answer = ( $term2, $term2 );
 
