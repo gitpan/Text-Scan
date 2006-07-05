@@ -37,3 +37,4 @@ t/96_boundary.t
 t/97_wildnull.t
 t/98_multiscan.t
 t/99_squeeze_spc.t
+META.yml                                 Module meta-data (added by MakeMaker)

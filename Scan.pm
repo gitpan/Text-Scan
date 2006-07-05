@@ -5,7 +5,7 @@ use strict;
 use warnings;
 
 use vars qw($VERSION);
-$VERSION = '0.26';
+$VERSION = '0.27';
 
 # The following are for debugging only
 #use ExtUtils::Embed;
@@ -13,7 +13,7 @@ $VERSION = '0.26';
 #use Inline Config => CLEAN_AFTER_BUILD => 0; # cp _Inline/build/Text/Scan/Scan.xs .
 
 use Inline C => 'DATA',
-            VERSION => '0.26',
+            VERSION => '0.27',
             NAME => 'Text::Scan';
 
 sub serialize {
@@ -475,15 +475,33 @@ void _scan(fsm this, char *s) {
 
     int match = 0;
     int position = 0;
+    int cue = 0;
     
     while(*s){
         this->s = s;
         this->position = position;
         match = _find_match(this, 0, this->root); 
 
-        // truncate s by length of match or first word...
+        // truncate s by single char to match everything possible
         if(match){ s++; position++; }
 
+        // cue up the first possible match:
+        // [boundary][ignore]*[firstmatchchar]/
+        if( cue = _cue(this, s) ){ 
+            position += cue; 
+            s += cue; }
+        else 
+            break;
+        
+        match = 0;
+    }
+}
+
+int _cue( fsm this, char *s ){
+
+    int position = 0;
+
+    while(*s){
         //Move to the first boundary char
         while( ! IS_BIT_ON(this->boundary, 0, *s) ) { s++; position++; }
 
@@ -492,10 +510,14 @@ void _scan(fsm this, char *s) {
 
         // move past any irrelevant chars
         while( IS_BIT_ON(this->ignore, 0, *s) ) { s++; position++; }
-        match = 0;
-    }
-}
 
+        // found a starting match point?
+        if( (int) _bsearch(this->charclasses, *s, this->root) ){
+            return position;
+        }
+    }
+    return 0;
+}
 
 
 void _dump(fsm m, trans p, char* k, int depth) {

@@ -67,3 +67,6 @@ Revision history for Perl extension Text::Scan.
 
 0.25 Thu Jan 19 17:42:29 PST 2006
 	- changed file operations in _serialize and _restore to PerlIO counterparts for ActiveState 5.8.x compatibility
+
+0.27 Wed Jul  5 15:54:21 PDT 2006
+	- changed state machine invocation conditions, calling _cue() first to prevent pathological backtracking in cases where spaces are squeezed and there are massive space-equivalents in the document string.
