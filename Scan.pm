@@ -5,7 +5,7 @@ use strict;
 use warnings;
 
 use vars qw($VERSION);
-$VERSION = '0.27';
+$VERSION = '0.28';
 
 # The following are for debugging only
 #use ExtUtils::Embed;
@@ -13,7 +13,7 @@ $VERSION = '0.27';
 #use Inline Config => CLEAN_AFTER_BUILD => 0; # cp _Inline/build/Text/Scan/Scan.xs .
 
 use Inline C => 'DATA',
-            VERSION => '0.27',
+            VERSION => '0.28',
             NAME => 'Text::Scan';
 
 sub serialize {
@@ -407,11 +407,15 @@ void _record_match(fsm this, int matchlen, trans p){
 int _eat_wild_chars(fsm this, int matchlen, trans p){
     char* t = this->s + matchlen;
     
+    int wildlength = 0;
+
     while( IS_BIT_ON( this->wild, 0, *t ) ){
         t++;
-        matchlen++;
+        wildlength++;
+        if(wildlength > 256) return 0;
     }
-    
+
+    matchlen += wildlength;
     p = p->next_state;
     return _find_match(this, matchlen, p);
 }

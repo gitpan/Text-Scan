@@ -70,3 +70,6 @@ Revision history for Perl extension Text::Scan.
 
 0.27 Wed Jul  5 15:54:21 PDT 2006
 	- changed state machine invocation conditions, calling _cue() first to prevent pathological backtracking in cases where spaces are squeezed and there are massive space-equivalents in the document string.
+
+0.28 Tue Aug 29 19:01:33 PDT 2006
+	- added limit of 256 to number of chars counted in a wildcard; this prevents some pathological cases when a binary file is scanned.
