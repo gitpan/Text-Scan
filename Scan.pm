@@ -5,7 +5,7 @@ use strict;
 use warnings;
 
 use vars qw($VERSION);
-$VERSION = '0.28';
+$VERSION = '0.29';
 
 # The following are for debugging only
 #use ExtUtils::Embed;
@@ -13,7 +13,7 @@ $VERSION = '0.28';
 #use Inline Config => CLEAN_AFTER_BUILD => 0; # cp _Inline/build/Text/Scan/Scan.xs .
 
 use Inline C => 'DATA',
-            VERSION => '0.28',
+            VERSION => '0.29',
             NAME => 'Text::Scan';
 
 sub serialize {
@@ -67,6 +67,9 @@ Text::Scan - Fast search for very large numbers of keys in a body of text.
 
     # Check for membership ($val is true)
     $val = $dict->has('pig');
+
+    # Retrieve value for given key. Returns undef if no key is found.
+    $val = $dict->val( $key );
 
     # Retrieve all keys. This returns all inserted keys in order 
     # of insertion 
@@ -207,13 +210,17 @@ C<Inline>
 
 =head1 COPYRIGHT
 
-Copyright 2001, 2002 Ira Woodhead. All rights reserved.
+Copyright 2001-2007 Ira Woodhead. All rights reserved.
 
 This library is free software; you can redistribute it and/or modify it under the same terms as Perl itself
 
 =head1 AUTHOR
 
 Ira Woodhead, textscan at sweetpota dot to
+
+=head1 MAINTAINER
+
+Thomas Busch, tbusch at cpan dot org
 
 =cut
 
@@ -725,6 +732,22 @@ int has(SV* obj, char *s) {
     fsm m = (fsm)SvIV(SvRV(obj));
     return _search(m->root, s);
 }
+
+SV* val(SV* obj, char *s) {
+    fsm m = (fsm)SvIV(SvRV(obj));
+    trans p = m->root;
+    while (p) {
+        while(p)
+            if(p->splitchar == *s) break;
+            else p = p->next_trans;
+        if(!p) return &PL_sv_undef;
+        if(!p->splitchar) return newSVsv((SV*) p->next_state);
+        p = p->next_state;
+        s++;
+    }
+    return &PL_sv_undef;
+}
+
 
 void dump(SV* obj){
     fsm m = (fsm)SvIV(SvRV(obj));
