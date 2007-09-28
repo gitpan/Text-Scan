@@ -31,6 +31,9 @@ SYNOPSIS
         # Check for membership ($val is true)
         $val = $dict->has('pig');
 
+        # Retrieve value for given key. Returns undef if no key is found.
+        $val = $dict->val( $key );
+
         # Retrieve all keys. This returns all inserted keys in order 
         # of insertion 
         @keys = $dict->keys();
@@ -101,6 +104,14 @@ SYNOPSIS
         # lately, new in v0.25
         $dict->squeezeblanks;
 
+        # Similar to the boundary method except that the actual boundary is
+        # considered to occur just before the boundary character. This is useful
+        # when the boundary character itself needs to be matched at the 
+        # beginning of a match.
+        # For example in order to search for '-foo' in 'bar-foo' the following
+        # class needs to be set
+        $dict->inclboundary('-');
+
 DESCRIPTION
     This module provides facilities for fast searching on strings with very
     many search keys. The basic object behaves somewhat like a perl hash,
@@ -113,7 +124,8 @@ DESCRIPTION
     by the use of several types of global character classes. These are
     different from regular expression char classes, in that they apply to
     the entire text and for all keys. These consist of the "ignore" class,
-    the "boundary" class, and any user-defined classes.
+    the "boundary" class, the "inclboundary" class, and any user-defined
+    classes.
 
     Using "ignore" characters you can have the scan pretend a char in the
     text simply does not exist. This is useful if you want to avoid
@@ -130,7 +142,15 @@ DESCRIPTION
     as the same. For instance this is used internally to implement
     case-insensitive matching.
 
+    About unicode/utf8 strings. Text::Scan acts at the octet level so it's
+    not aware of anything about unicode/utf8 encoded strings. If you deal
+    with such strings, it's recommended to give octets strings to Text::Scan
+    using Encode::encode_utf8(). Text::Scan will then give you back octets
+    strings , utf8 encoded found keys.
+
 NEW
+    In v 0.30: "inclboundary" character class. Empty by default.
+
     In v 0.19: "boundary" character class defines legal boundary characters
     for all matches. Default is single space for backward compatibility.
 
@@ -177,6 +197,9 @@ CREDITS
 
     The C code interface was created using Ingerson's "Inline".
 
+    This module is an implementation of the Aho/Corasick Pattern Matching
+    algorithm.
+
 OLD CREDITS (versions prior to 0.13)
     The basic data structure used to be a ternary trie, but I changed it
     starting with version 0.13 to a finite state machine, for the sake of
@@ -210,11 +233,16 @@ SEE ALSO
     "Inline"
 
 COPYRIGHT
-    Copyright 2001, 2002 Ira Woodhead. All rights reserved.
+    Copyright 2001-2007 Ira Woodhead. All rights reserved.
 
     This library is free software; you can redistribute it and/or modify it
     under the same terms as Perl itself
 
 AUTHOR
     Ira Woodhead, textscan at sweetpota dot to
+
+MAINTAINERS
+    Thomas Busch, tbusch at cpan dot org
+
+    Jerome Eteve, jerome dot eteve at gmail dot com
 

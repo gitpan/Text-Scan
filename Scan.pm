@@ -5,7 +5,7 @@ use strict;
 use warnings;
 
 use vars qw($VERSION);
-$VERSION = '0.29';
+$VERSION = '0.30';
 
 # The following are for debugging only
 #use ExtUtils::Embed;
@@ -13,8 +13,8 @@ $VERSION = '0.29';
 #use Inline Config => CLEAN_AFTER_BUILD => 0; # cp _Inline/build/Text/Scan/Scan.xs .
 
 use Inline C => 'DATA',
-            VERSION => '0.29',
-            NAME => 'Text::Scan';
+            VERSION => '0.30',
+            NAME => 'Text::Scan' ;
 
 sub serialize {
     my ($self, $filename) = @_;
@@ -142,11 +142,19 @@ Text::Scan - Fast search for very large numbers of keys in a body of text.
     # lately, new in v0.25
     $dict->squeezeblanks;
 
+    # Similar to the boundary method except that the actual boundary is
+    # considered to occur just before the boundary character. This is useful
+    # when the boundary character itself needs to be matched at the 
+    # beginning of a match.
+    # For example in order to search for '-foo' in 'bar-foo' the following
+    # class needs to be set
+    $dict->inclboundary('-');
+
 =head1 DESCRIPTION
 
 This module provides facilities for fast searching on strings with very many search keys. The basic object behaves somewhat like a perl hash, except that you can retrieve based on a superstring of any keys stored. Simply scan a string as shown above and you will get back a perl hash (or list) of all keys found in the string (along with associated values and/or positions). All keys present in the text are returned.
 
-There are several ways to influence the behavior of the match, chiefly by the use of several types of B<global character classes>. These are different from regular expression char classes, in that they apply to the entire text and for all keys. These consist of the "ignore" class, the "boundary" class, and any user-defined classes.
+There are several ways to influence the behavior of the match, chiefly by the use of several types of B<global character classes>. These are different from regular expression char classes, in that they apply to the entire text and for all keys. These consist of the "ignore" class, the "boundary" class, the "inclboundary" class, and any user-defined classes.
 
 Using "ignore" characters you can have the scan pretend a char in the text simply does not exist. This is useful if you want to avoid tokenizing your text. So for instance, if the period '.' is in your "ignore" class, the text will be treated exactly as if all periods had been deleted.
 
@@ -154,8 +162,12 @@ To define what characters may count as the delimiter of any match (single space 
 
 Any user-defined character classes can be used to count different chars as the same. For instance this is used internally to implement case-insensitive matching.
 
+About unicode/utf8 strings. Text::Scan acts at the octet level so it's not aware of anything about unicode/utf8 encoded strings. If you deal with such strings, it's recommended to give octets strings to Text::Scan using Encode::encode_utf8(). Text::Scan will then give you back octets strings , utf8 encoded found keys.
+
 
 =head1 NEW
+
+In v 0.30: "inclboundary" character class. Empty by default.
 
 In v 0.19: "boundary" character class defines legal boundary characters for all matches. Default is single space for backward compatibility.
 
@@ -183,6 +195,7 @@ Many test scripts come directly from Rogaski's C<Tree::Ternary> module.
 
 The C code interface was created using Ingerson's C<Inline>.
 
+This module is an implementation of the Aho/Corasick Pattern Matching algorithm.
 
 =head1 OLD CREDITS (versions prior to 0.13)
 
@@ -218,9 +231,11 @@ This library is free software; you can redistribute it and/or modify it under th
 
 Ira Woodhead, textscan at sweetpota dot to
 
-=head1 MAINTAINER
+=head1 MAINTAINERS
 
 Thomas Busch, tbusch at cpan dot org
+
+Jerome Eteve, jerome dot eteve at gmail dot com
 
 =cut
 
@@ -246,6 +261,7 @@ typedef struct FSM {
     int maxpath;
     char* ignore;
     char* boundary;
+    char* inclboundary ;
     char* charclasses;
     char* wild;     // all chars which match a wildcard
     AV* found_keys;
@@ -341,8 +357,9 @@ trans _insert_(fsm m, trans p, char *s, SV* val) {
 
     // continue inserting the rest of the string. If there is no more
     // string, place the SV* val into this termination transition.
-    if(*s)
+    if(*s){
         t->next_state = _insert_(m, t->next_state, ++s, val);
+    }
     else {
         if(t->next_state) 
             sv_2mortal((SV*)t->next_state);
@@ -443,12 +460,16 @@ int _find_match(fsm this, int matchlen, trans p){
 
         // if this is a termination state
         if(!p->splitchar){
-            if( IS_BIT_ON( this->boundary, 0, *t ) ){
+            
+            if( IS_BIT_ON( this->boundary, 0, *t ) 
+                || IS_BIT_ON( this->inclboundary,0,*t)
+                ){
                 matchlen = depth - 1;
                 _record_match(this, matchlen, p);
             }
             p = p->next_trans;
         }
+	
 
         // ignore irrelevant chars
         while( IS_BIT_ON(this->ignore, 0, *t) ){
@@ -513,12 +534,25 @@ int _cue( fsm this, char *s ){
     int position = 0;
 
     while(*s){
-        //Move to the first boundary char
-        while( ! IS_BIT_ON(this->boundary, 0, *s) ) { s++; position++; }
-
-        // chop off the first boundary
-        if(*s != 0) { s++; position++; }
-
+      
+      
+      //Move to the first boundary char
+      //or stop in case the char is an inclboundary
+      // When we are in a word, we dont want to skip the chars who
+      // could be included boundary
+      // But we still want to skip at least to the next char,
+      
+      while( ! IS_BIT_ON(this->boundary, 0, *s)  ) {
+	s++; position++; 
+	if ( IS_BIT_ON(this->inclboundary,0,*s) ) { break ;}
+      }
+      
+      // chop off the first boundary only if not an included boundary
+	if(*s != 0
+	   && ! IS_BIT_ON(this->inclboundary,0,*s)
+	   ) { s++; position++; }
+	
+	   
         // move past any irrelevant chars
         while( IS_BIT_ON(this->ignore, 0, *s) ) { s++; position++; }
 
@@ -563,6 +597,10 @@ void _init_boundary(char* vec){
     BIT_ON( vec, 0, (int) ' ' );
 }
 
+void _init_inclboundary(char* vec ){
+}
+ 
+
 void _init_wild(char* vec){
     int i;
     for(i=1;i<256;i++){
@@ -587,8 +625,10 @@ SV* new(char* class){
     m->ignore   = (char*) calloc(256/sizeof(char), sizeof(char));
     m->boundary = (char*) calloc(256/sizeof(char), sizeof(char));
     m->wild     = (char*) calloc(256/sizeof(char), sizeof(char));
+    m->inclboundary =  (char*) calloc(256/sizeof(char), sizeof(char));
     m->charclasses = (char*) calloc((256*256)/sizeof(char), sizeof(char));
-
+    
+    _init_inclboundary(m->inclboundary);
     _init_boundary(m->boundary);
     _init_charclasses(m->charclasses);
     _init_wild(m->wild);
@@ -711,8 +751,26 @@ void boundary(SV* obj, char* b){
     else
         for(; *b; b++ )
             BIT_ON( m->boundary, 0, *b );
-            
+    
+    
 }
+
+
+void inclboundary(SV* obj, char* b){
+  fsm m = (fsm)SvIV(SvRV(obj));
+  int i;
+  
+  // Reset boundary to none
+  for( i=0; i<(256/sizeof(char)); i++ )
+      *(m->inclboundary + i) = 0;  
+
+  if(!*b){ return ; }
+  
+  for(; *b; b++ )
+    BIT_ON( m->inclboundary, 0, *b );
+    
+}
+
 
 int insert(SV* obj, SV* key, SV* val) {
     fsm m = (fsm)SvIV(SvRV(obj));
