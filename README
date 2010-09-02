@@ -233,7 +233,7 @@ SEE ALSO
     "Inline"
 
 COPYRIGHT
-    Copyright 2001-2007 Ira Woodhead. All rights reserved.
+    Copyright 2001-2010 Ira Woodhead. All rights reserved.
 
     This library is free software; you can redistribute it and/or modify it
     under the same terms as Perl itself
@@ -243,6 +243,4 @@ AUTHOR
 
 MAINTAINERS
     Thomas Busch, tbusch at cpan dot org
-
-    Jerome Eteve, jerome dot eteve at gmail dot com
 

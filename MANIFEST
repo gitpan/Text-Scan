@@ -3,6 +3,8 @@ MANIFEST
 Makefile.PL
 README
 Scan.pm
+Scan.xs
+INLINE.h
 t/00_load.t
 t/02_new.t
 t/04_attrib.t

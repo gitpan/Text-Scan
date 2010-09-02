@@ -1,8 +1,14 @@
-use Inline::MakeMaker;
-# See lib/ExtUtils/MakeMaker.pm for details of how to influence
-# the contents of the Makefile that is written.
-WriteInlineMakefile(
-    'NAME'		=> 'Text::Scan',
-    'VERSION_FROM'	=> 'Scan.pm', # finds $VERSION
-    'PREREQ_PM'		=> {Inline => 0.43}, # e.g., Module::Name => 1.1
+use strict;
+use warnings;
+use ExtUtils::MakeMaker;
+
+WriteMakefile(
+    NAME                => 'Text::Scan',
+    VERSION_FROM        => 'Scan.pm',
+    DEFINE              => '',
+    OBJECT              => '$(O_FILES)',
+    OPTIMIZE            => ' ',
+    dist                => { COMPRESS => 'gzip -9f', SUFFIX => 'gz', },
+    clean               => { FILES => 'Text-Scan-*' },
 );
+

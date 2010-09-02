@@ -1,245 +1,7 @@
-package Text::Scan;
-
-require 5.005_62;
-use strict;
-use warnings;
-
-require Exporter;
-our %EXPORT_TAGS = ( 'all' => [ qw() ] );
-our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
-our $VERSION = '0.31';
-our @ISA = qw(Exporter);
-
-require XSLoader;
-XSLoader::load('Text::Scan', $VERSION);
-
-sub serialize {
-    my ($self, $filename) = @_;
-    return _serialize( $self, "$filename.trie", "$filename.vals" );
-}
-
-sub restore {
-    my ($self, $filename) = @_;
-    return _restore( $self, "$filename.trie", "$filename.vals");
-}
-
-
-1;
-
-__DATA__
-
-
-=pod
-
-=head1 NAME
-
-Text::Scan - Fast search for very large numbers of keys in a body of text.
-
-=head1 SYNOPSIS
-
-    use Text::Scan;
-
-    $dict = new Text::Scan;
-
-    %terms = ( dog  => 'canine',
-               bear => 'ursine',
-               pig  => 'porcine' );
-
-    # load the dictionary with keys and values
-    # (values can be any scalar, keys must be strings)
-    while( ($key, $val) = each %terms ){
-        $dict->insert( $key, $val );
-    }
-
-    # Scan a document for matches
-    $document = 'the dog ate the bear but the dog got indigestion';
-    %found = $dict->scan( $document );
-    # now %found is ( dog => canine, bear => ursine )
-
-    # Or, if you need to count number of occurrences of any given 
-    # key, use an array. This will give you a countable flat list
-    # of key => value pairs.
-    @found = $dict->scan( $document );
-    # now @found is ( dog => canine, bear => ursine, dog => canine )
-
-    # Check for membership ($val is true)
-    $val = $dict->has('pig');
-
-    # Retrieve value for given key. Returns undef if no key is found.
-    $val = $dict->val( $key );
-
-    # Retrieve all keys. This returns all inserted keys in order 
-    # of insertion 
-    @keys = $dict->keys();
-    # @keys is ( dog, bear, pig )
-
-    # Retrieve all values (in same order as corresponding keys) 
-    # (new in v0.10)
-    @vals = $dict->values();
-    # @vals is ( canine, ursine, porcine )
-
-    # Get back everything you inserted
-    %everything = $dict->dump();
-
-    # "mindex"
-    # Like perl's index() but with multiple patterns (new in v0.07)
-    # you can scan for the starting positions of terms.
-    @indices = $dict->mindex( $document );
-    # @indices is ( dog => 4, bear => 16, dog => 29 ) 
-
-    # The hash context yields the position of the last occurrences 
-    # of each word 
-    %indices = $dict->mindex( $document ); 
-    # %indices is ( dog => 26, bear => 16 )
-
-    # multiscan() (>= v0.23)
-    # Retrieves everything scan() and mindex() does, in the form
-    # of an array of references. Each reference points to a list
-    # of (key, index, value)
-    @result = $dict->multiscan($document);
-    # @result is ([dog, 4, canine], [bear, 16, ursine], [dog, 29, canine])
-
-
-    # Turn on wildcard scanning. (>= v0.09) 
-    # This can be done anytime. Works for scan() and mindex(). Wildcards
-    # encompass any number of non-single-space-equivalent chars.
-    $dict->usewild();
-
-    # Save a dictionary, then restore it. (serialize and restore new in v0.14)
-    # This is cool but beware, all values will be converted to strings.
-    # Note restore() is much faster than the original insertion of 
-    # key/values. These return 0 on success, errno on failure.
-    $dict->serialize("dict_name");
-    $dict->restore("dict_name");
-
-    # Place a global char equivalency class into effect. This matches all
-    # these characters as if they were the same. (v0.17)
-    $dict->charclass(".:;,?");
-    $dict->insert("What?", "What?");
-    @found = $dict->scan("Err... What, something wrong?");
-    # now @found is ( "What," => "What?" );
-
-    # Scan case-insensitively. This must be called before any insertions.
-    $dict->ignorecase();
-
-    # Set a class of chars to be the boundaries of any match, 
-    # such that the chars immediately before the beginning and after the
-    # ending of a match have to be in this class. Default is the single
-    # space. (beginning and ending of string always count as bounds)
-    # This can be called at any time, and supercedes any previous calls.
-    $dict->boundary(".? ");
-
-    # Ignore certain chars. You can define a class of chars that the
-    # dictionary should pretend do not exist. You must call this before
-    # any insertions.
-    $dict->ignore("\n\r<>()");
-
-    # Treat all contiguous single-space-equivalent chars 
-    # (as defined by charclass()) as one char. Most requested feature 
-    # lately, new in v0.25
-    $dict->squeezeblanks;
-
-    # Similar to the boundary method except that the actual boundary is
-    # considered to occur just before the boundary character. This is useful
-    # when the boundary character itself needs to be matched at the 
-    # beginning of a match.
-    # For example in order to search for '-foo' in 'bar-foo' the following
-    # class needs to be set
-    $dict->inclboundary('-');
-
-=head1 DESCRIPTION
-
-This module provides facilities for fast searching on strings with very many search keys. The basic object behaves somewhat like a perl hash, except that you can retrieve based on a superstring of any keys stored. Simply scan a string as shown above and you will get back a perl hash (or list) of all keys found in the string (along with associated values and/or positions). All keys present in the text are returned.
-
-There are several ways to influence the behavior of the match, chiefly by the use of several types of B<global character classes>. These are different from regular expression char classes, in that they apply to the entire text and for all keys. These consist of the "ignore" class, the "boundary" class, the "inclboundary" class, and any user-defined classes.
-
-Using "ignore" characters you can have the scan pretend a char in the text simply does not exist. This is useful if you want to avoid tokenizing your text. So for instance, if the period '.' is in your "ignore" class, the text will be treated exactly as if all periods had been deleted.
-
-To define what characters may count as the delimiter of any match (single space by default) you can use the "boundary" class. For instance this way you can count punctuation as a boundary, and phrases bounded at the end by punctuation will match.
-
-Any user-defined character classes can be used to count different chars as the same. For instance this is used internally to implement case-insensitive matching.
-
-About unicode/utf8 strings. Text::Scan acts at the octet level so it's not aware of anything about unicode/utf8 encoded strings. If you deal with such strings, it's recommended to give octets strings to Text::Scan using Encode::encode_utf8(). Text::Scan will then give you back octets strings , utf8 encoded found keys.
-
-
-=head1 NEW
-
-In v 0.31: Removed Inline::C dependency
-
-In v 0.30: "inclboundary" character class. Empty by default.
-
-In v 0.19: "boundary" character class defines legal boundary characters for all matches. Default is single space for backward compatibility.
-
-In v 0.18: Global "ignore" character classes. This, along with general global char classes and case-insensitivity, should allow you to eliminate most preprocessing.
-
-In v 0.17: Global character classes, see example above. Also thereby case-insensitivity.
-
-In v 0.16: Now all patterns present in the text are returned regardless of where they begin or end.
-
-In v 0.13: A more-or-less complete rewrite of Text::Scan uses a more traditional finite-state machine rather than a ternary trie for the basic data structure. This results in an average 20% savings in memory and 10% savings in runtime, besides being much simpler to implement, thus less prone to bugs.
-
-In v 0.09: Wildcards! A limited wildcard functionality is available. call usewild() to turn it on. Thereafter any asterisk (*) followed by a space (' ') will be treated as "zero or more non-space characters". Once this function is turned on, the scan will be approximately 50% slower than with literal strings. If you include '*' in any key without calling usewild(), the '*' will be treated literally.
-
-=head1 TO DO
-
-Some obvious things have not been implemented. Deletion of key/values, patterns as keys (kind of a big one), the abovementioned elimination of the default boundary marker ' ', possibility of calling scan() with a filehandle instead of a string scalar. There is also an optimization I've been thinking about, call it "continuation reentrancy", that would greatly speed up matches on literal strings by never examining the same input char more than once.
-
-Another optimization that might help is a transition reordering scheme for the sequential searches within states. This was shown by Sleator to reduce the strict number of comparisons over time.
-
-=head1 CREDITS
-
-Chad, Tara, Dan, Kim, love ya sweethearts.
-
-Many test scripts come directly from Rogaski's C<Tree::Ternary> module.
-
-The C code interface was created using Ingerson's C<Inline>.
-
-This module is an implementation of the Aho/Corasick Pattern Matching algorithm.
-
-=head1 OLD CREDITS (versions prior to 0.13)
-
-The basic data structure used to be a ternary trie, but I changed it starting with version 0.13 to a finite state machine, for the sake of performance and simplicity. However, it was a lot of fun working with these ideas, so I'm including the old credits here.
-
-The basic framework for this code is borrowed from both Bentley & Sedgwick, and Leon Brocard's additions to it for C<Tree::Ternary_XS>. The differences are in the modified search algorithm to allow for scanning, the storage of keys/values, and an extra node-rotation for gradual self-adjusting optimization to the statistical characteristics of the target text.
-
-Many test scripts come directly from Rogaski's C<Tree::Ternary> module.
-
-The C code interface was created using Ingerson's C<Inline>.
-
-=head1 SEE ALSO
-
-C<Bentley & Sedgwick "Fast Algorithms for Sorting and Searching Strings", Proceedings ACM-SIAM (1997)>
-
-C<Bentley & Sedgewick "Ternary Search Trees", Dr Dobbs Journal (1998)>
-
-C<Sleator & Tarjan "Self-Adjusting Binary Search Trees", Journal of the ACM (1985)>
-
-C<Tree::Ternary>
-
-C<Tree::Ternary_XS>
-
-C<Inline>
-
-=head1 COPYRIGHT
-
-Copyright 2001-2007 Ira Woodhead. All rights reserved.
-
-This library is free software; you can redistribute it and/or modify it under the same terms as Perl itself
-
-=head1 AUTHOR
-
-Ira Woodhead, textscan at sweetpota dot to
-
-=head1 MAINTAINERS
-
-Thomas Busch, tbusch at cpan dot org
-
-Jerome Eteve, jerome dot eteve at gmail dot com
-
-=cut
-
-
-__C__
+#include "EXTERN.h"
+#include "perl.h"
+#include "XSUB.h"
+#include "INLINE.h"
 
 
 // The transition. There are no explicit states, just linked
@@ -1126,4 +888,349 @@ int _restore( SV* obj, char *triename, char *valsname ){
 
 
 
+
+
+MODULE = Text::Scan	PACKAGE = Text::Scan	
+
+PROTOTYPES: DISABLE
+
+
+void
+_init_charclasses (vecs)
+	char *	vecs
+	PREINIT:
+	I32* temp;
+	PPCODE:
+	temp = PL_markstack_ptr++;
+	_init_charclasses(vecs);
+	if (PL_markstack_ptr != temp) {
+          /* truly void, because dXSARGS not invoked */
+	  PL_markstack_ptr = temp;
+	  XSRETURN_EMPTY; /* return empty stack */
+        }
+        /* must have used dXSARGS; list context implied */
+	return; /* assume stack size is correct */
+
+void
+_init_boundary (vec)
+	char *	vec
+	PREINIT:
+	I32* temp;
+	PPCODE:
+	temp = PL_markstack_ptr++;
+	_init_boundary(vec);
+	if (PL_markstack_ptr != temp) {
+          /* truly void, because dXSARGS not invoked */
+	  PL_markstack_ptr = temp;
+	  XSRETURN_EMPTY; /* return empty stack */
+        }
+        /* must have used dXSARGS; list context implied */
+	return; /* assume stack size is correct */
+
+void
+_init_inclboundary (vec)
+	char *	vec
+	PREINIT:
+	I32* temp;
+	PPCODE:
+	temp = PL_markstack_ptr++;
+	_init_inclboundary(vec);
+	if (PL_markstack_ptr != temp) {
+          /* truly void, because dXSARGS not invoked */
+	  PL_markstack_ptr = temp;
+	  XSRETURN_EMPTY; /* return empty stack */
+        }
+        /* must have used dXSARGS; list context implied */
+	return; /* assume stack size is correct */
+
+void
+_init_wild (vec)
+	char *	vec
+	PREINIT:
+	I32* temp;
+	PPCODE:
+	temp = PL_markstack_ptr++;
+	_init_wild(vec);
+	if (PL_markstack_ptr != temp) {
+          /* truly void, because dXSARGS not invoked */
+	  PL_markstack_ptr = temp;
+	  XSRETURN_EMPTY; /* return empty stack */
+        }
+        /* must have used dXSARGS; list context implied */
+	return; /* assume stack size is correct */
+
+SV *
+new (class)
+	char *	class
+
+void
+DESTROY (obj)
+	SV *	obj
+	PREINIT:
+	I32* temp;
+	PPCODE:
+	temp = PL_markstack_ptr++;
+	DESTROY(obj);
+	if (PL_markstack_ptr != temp) {
+          /* truly void, because dXSARGS not invoked */
+	  PL_markstack_ptr = temp;
+	  XSRETURN_EMPTY; /* return empty stack */
+        }
+        /* must have used dXSARGS; list context implied */
+	return; /* assume stack size is correct */
+
+void
+usewild (obj)
+	SV *	obj
+	PREINIT:
+	I32* temp;
+	PPCODE:
+	temp = PL_markstack_ptr++;
+	usewild(obj);
+	if (PL_markstack_ptr != temp) {
+          /* truly void, because dXSARGS not invoked */
+	  PL_markstack_ptr = temp;
+	  XSRETURN_EMPTY; /* return empty stack */
+        }
+        /* must have used dXSARGS; list context implied */
+	return; /* assume stack size is correct */
+
+void
+squeezeblanks (obj)
+	SV *	obj
+	PREINIT:
+	I32* temp;
+	PPCODE:
+	temp = PL_markstack_ptr++;
+	squeezeblanks(obj);
+	if (PL_markstack_ptr != temp) {
+          /* truly void, because dXSARGS not invoked */
+	  PL_markstack_ptr = temp;
+	  XSRETURN_EMPTY; /* return empty stack */
+        }
+        /* must have used dXSARGS; list context implied */
+	return; /* assume stack size is correct */
+
+void
+charclass (obj, vecstring)
+	SV *	obj
+	char *	vecstring
+	PREINIT:
+	I32* temp;
+	PPCODE:
+	temp = PL_markstack_ptr++;
+	charclass(obj, vecstring);
+	if (PL_markstack_ptr != temp) {
+          /* truly void, because dXSARGS not invoked */
+	  PL_markstack_ptr = temp;
+	  XSRETURN_EMPTY; /* return empty stack */
+        }
+        /* must have used dXSARGS; list context implied */
+	return; /* assume stack size is correct */
+
+void
+ignore (obj, vecstring)
+	SV *	obj
+	char *	vecstring
+	PREINIT:
+	I32* temp;
+	PPCODE:
+	temp = PL_markstack_ptr++;
+	ignore(obj, vecstring);
+	if (PL_markstack_ptr != temp) {
+          /* truly void, because dXSARGS not invoked */
+	  PL_markstack_ptr = temp;
+	  XSRETURN_EMPTY; /* return empty stack */
+        }
+        /* must have used dXSARGS; list context implied */
+	return; /* assume stack size is correct */
+
+void
+ignorecase (obj)
+	SV *	obj
+	PREINIT:
+	I32* temp;
+	PPCODE:
+	temp = PL_markstack_ptr++;
+	ignorecase(obj);
+	if (PL_markstack_ptr != temp) {
+          /* truly void, because dXSARGS not invoked */
+	  PL_markstack_ptr = temp;
+	  XSRETURN_EMPTY; /* return empty stack */
+        }
+        /* must have used dXSARGS; list context implied */
+	return; /* assume stack size is correct */
+
+void
+boundary (obj, b)
+	SV *	obj
+	char *	b
+	PREINIT:
+	I32* temp;
+	PPCODE:
+	temp = PL_markstack_ptr++;
+	boundary(obj, b);
+	if (PL_markstack_ptr != temp) {
+          /* truly void, because dXSARGS not invoked */
+	  PL_markstack_ptr = temp;
+	  XSRETURN_EMPTY; /* return empty stack */
+        }
+        /* must have used dXSARGS; list context implied */
+	return; /* assume stack size is correct */
+
+void
+inclboundary (obj, b)
+	SV *	obj
+	char *	b
+	PREINIT:
+	I32* temp;
+	PPCODE:
+	temp = PL_markstack_ptr++;
+	inclboundary(obj, b);
+	if (PL_markstack_ptr != temp) {
+          /* truly void, because dXSARGS not invoked */
+	  PL_markstack_ptr = temp;
+	  XSRETURN_EMPTY; /* return empty stack */
+        }
+        /* must have used dXSARGS; list context implied */
+	return; /* assume stack size is correct */
+
+int
+insert (obj, key, val)
+	SV *	obj
+	SV *	key
+	SV *	val
+
+int
+has (obj, s)
+	SV *	obj
+	char *	s
+
+SV *
+val (obj, s)
+	SV *	obj
+	char *	s
+
+void
+dump (obj)
+	SV *	obj
+	PREINIT:
+	I32* temp;
+	PPCODE:
+	temp = PL_markstack_ptr++;
+	dump(obj);
+	if (PL_markstack_ptr != temp) {
+          /* truly void, because dXSARGS not invoked */
+	  PL_markstack_ptr = temp;
+	  XSRETURN_EMPTY; /* return empty stack */
+        }
+        /* must have used dXSARGS; list context implied */
+	return; /* assume stack size is correct */
+
+void
+keys (obj)
+	SV *	obj
+	PREINIT:
+	I32* temp;
+	PPCODE:
+	temp = PL_markstack_ptr++;
+	keys(obj);
+	if (PL_markstack_ptr != temp) {
+          /* truly void, because dXSARGS not invoked */
+	  PL_markstack_ptr = temp;
+	  XSRETURN_EMPTY; /* return empty stack */
+        }
+        /* must have used dXSARGS; list context implied */
+	return; /* assume stack size is correct */
+
+void
+values (obj)
+	SV *	obj
+	PREINIT:
+	I32* temp;
+	PPCODE:
+	temp = PL_markstack_ptr++;
+	values(obj);
+	if (PL_markstack_ptr != temp) {
+          /* truly void, because dXSARGS not invoked */
+	  PL_markstack_ptr = temp;
+	  XSRETURN_EMPTY; /* return empty stack */
+        }
+        /* must have used dXSARGS; list context implied */
+	return; /* assume stack size is correct */
+
+int
+states (obj)
+	SV *	obj
+
+int
+transitions (obj)
+	SV *	obj
+
+int
+terminals (obj)
+	SV *	obj
+
+void
+scan (obj, s)
+	SV *	obj
+	char *	s
+	PREINIT:
+	I32* temp;
+	PPCODE:
+	temp = PL_markstack_ptr++;
+	scan(obj, s);
+	if (PL_markstack_ptr != temp) {
+          /* truly void, because dXSARGS not invoked */
+	  PL_markstack_ptr = temp;
+	  XSRETURN_EMPTY; /* return empty stack */
+        }
+        /* must have used dXSARGS; list context implied */
+	return; /* assume stack size is correct */
+
+void
+mindex (obj, s)
+	SV *	obj
+	char *	s
+	PREINIT:
+	I32* temp;
+	PPCODE:
+	temp = PL_markstack_ptr++;
+	mindex(obj, s);
+	if (PL_markstack_ptr != temp) {
+          /* truly void, because dXSARGS not invoked */
+	  PL_markstack_ptr = temp;
+	  XSRETURN_EMPTY; /* return empty stack */
+        }
+        /* must have used dXSARGS; list context implied */
+	return; /* assume stack size is correct */
+
+void
+multiscan (obj, s)
+	SV *	obj
+	char *	s
+	PREINIT:
+	I32* temp;
+	PPCODE:
+	temp = PL_markstack_ptr++;
+	multiscan(obj, s);
+	if (PL_markstack_ptr != temp) {
+          /* truly void, because dXSARGS not invoked */
+	  PL_markstack_ptr = temp;
+	  XSRETURN_EMPTY; /* return empty stack */
+        }
+        /* must have used dXSARGS; list context implied */
+	return; /* assume stack size is correct */
+
+int
+_serialize (obj, triename, valsname)
+	SV *	obj
+	char *	triename
+	char *	valsname
+
+int
+_restore (obj, triename, valsname)
+	SV *	obj
+	char *	triename
+	char *	valsname
 

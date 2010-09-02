@@ -79,3 +79,6 @@ Revision history for Perl extension Text::Scan.
 
 0.30 Wed Sep 26 15:23:24 BST 2007
     - applied Jerome Eteve's patch that adds the inclboundary class
+
+0.31 Thu Sep  2 18:05:24 UTC 2010
+    - removed Inline::C dependency
